@@ -131,11 +131,15 @@ const Community = () => {
       console.log('Initializing socket connection to:', SOCKET_URL);
       const newSocket = io(SOCKET_URL, {
         auth: { token },
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5
+        reconnectionAttempts: 5,
+        withCredentials: true,
+        extraHeaders: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       newSocket.on('connect', () => {

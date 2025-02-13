@@ -34,7 +34,7 @@ const corsOptions = {
     : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
@@ -45,15 +45,19 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Socket.IO CORS
-const socketCorsOptions = {
-  ...corsOptions,
-  methods: ['GET', 'POST']
-};
-
 const io = socketIo(server, {
-  cors: socketCorsOptions,
-  path: '/socket.io'
+  cors: {
+    origin: corsOptions.origin,
+    methods: ['GET', 'POST'],
+    credentials: true,
+    allowedHeaders: corsOptions.allowedHeaders
+  },
+  path: '/socket.io',
+  transports: ['websocket', 'polling']
 });
+
+// Add preflight handling
+app.options('*', cors(corsOptions));
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
