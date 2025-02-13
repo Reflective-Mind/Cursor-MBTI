@@ -108,8 +108,11 @@ Detailed assessment results:
         } Provide helpful, personalized advice and insights about MBTI personality types. Keep responses concise and focused on MBTI-related topics.`
       };
 
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+      const apiUrl = `${baseUrl}/api/chat/message`;
+
       console.log('Test 5 - Sending chat request:', {
-        url: `${process.env.REACT_APP_API_URL}/api/chat/message`,
+        url: apiUrl,
         messages: messages.length,
         token: token ? 'Present' : 'Missing',
         systemMessage: 'Present',
@@ -119,7 +122,7 @@ Detailed assessment results:
         }
       });
 
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/chat/message`, {
+      const response = await axios.post(apiUrl, {
         messages: [
           systemMessage,
           ...messages.filter(msg => msg.role !== 'error'),
@@ -187,12 +190,13 @@ Detailed assessment results:
         return;
       }
 
-      setError('Test 5 - Sorry, I encountered an error. Please try again.');
+      const errorMessage = error.response?.data?.details || error.message;
+      setError(`Test 5 - ${errorMessage}`);
       setMessages((prev) => [
         ...prev,
         {
-          role: 'assistant',
-          content: 'Test 5 - I apologize, but I encountered an error. Please try again.',
+          role: 'error',
+          content: `Test 5 - Error: ${errorMessage}`,
         },
       ]);
     } finally {

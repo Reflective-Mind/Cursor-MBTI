@@ -44,11 +44,18 @@ router.post('/message', auth, async (req, res) => {
     }
 
     const apiUrl = 'https://api.lechat.ai/v1/chat/completions';
-    console.log('Test 5 - Making request to LeChat API');
+    console.log('Test 5 - Making request to LeChat API:', {
+      url: apiUrl,
+      messageCount: req.body.messages.length,
+      apiKey: process.env.LECHAT_API_KEY ? 'Present' : 'Missing'
+    });
 
     const response = await axios.post(apiUrl, {
       model: "gpt-3.5-turbo",
-      messages: req.body.messages,
+      messages: req.body.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })),
       temperature: 0.7,
       max_tokens: 1000,
       presence_penalty: 0.6,

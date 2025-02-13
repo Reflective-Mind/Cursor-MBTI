@@ -214,9 +214,13 @@ const Community = () => {
     if (!socket) return;
 
     socket.on('channel:messages', (channelMessages) => {
-      console.log('Received messages:', channelMessages);
+      console.log('Test 3 - Received channel messages:', {
+        count: channelMessages.length,
+        channelId: currentChannel?._id
+      });
+      
       if (currentChannel) {
-        // Filter out deleted messages when loading channel messages
+        // Filter out deleted messages and store in state
         const filteredMessages = channelMessages.filter(msg => !msg.deleted);
         setChannelMessages(prev => ({
           ...prev,
@@ -229,13 +233,17 @@ const Community = () => {
     });
 
     socket.on('message:new', (newMessage) => {
-      console.log('New message received:', newMessage);
+      console.log('Test 3 - New message received:', {
+        messageId: newMessage._id,
+        channelId: newMessage.channel,
+        currentChannel: currentChannel?._id
+      });
+      
       if (newMessage.channel.toString() === currentChannel?._id.toString()) {
         setMessages(prev => {
-          // Remove optimistic message if it exists
           const filtered = prev.filter(msg => !msg.temporary);
           const updated = [...filtered, newMessage];
-          // Update channel messages
+          // Update channel messages cache
           setChannelMessages(prevChannelMessages => ({
             ...prevChannelMessages,
             [currentChannel._id]: updated
@@ -303,7 +311,7 @@ const Community = () => {
       try {
         setIsLoading(true);
         const token = localStorage.getItem('token');
-        console.log('Fetching channels:', {
+        console.log('Test 3 - Fetching channels:', {
           url: `${process.env.REACT_APP_API_URL}/api/community/channels`,
           token: token ? 'Present' : 'Missing'
         });
@@ -312,14 +320,15 @@ const Community = () => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          credentials: 'include'
         });
         
         const data = await response.json();
-        console.log('Channels API response:', {
+        console.log('Test 3 - Channels API response:', {
           status: response.status,
           ok: response.ok,
-          data,
+          channelCount: data.channels?.length,
           headers: Object.fromEntries(response.headers.entries())
         });
         
@@ -329,12 +338,17 @@ const Community = () => {
         
         setChannels(data.channels);
         
-        // Auto-join first channel if we have channels and socket
+        // Auto-join first channel if we have channels and socket and no current channel
         if (data.channels.length > 0 && socket && !currentChannel) {
-          handleChannelSelect(data.channels[0]);
+          const firstChannel = data.channels[0];
+          console.log('Test 3 - Auto-joining first channel:', {
+            channelId: firstChannel._id,
+            channelName: firstChannel.name
+          });
+          handleChannelSelect(firstChannel);
         }
       } catch (error) {
-        console.error('Error fetching channels:', {
+        console.error('Test 3 - Error fetching channels:', {
           message: error.message,
           env: {
             NODE_ENV: process.env.NODE_ENV,
