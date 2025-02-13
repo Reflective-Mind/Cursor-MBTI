@@ -38,7 +38,8 @@ const Login = () => {
 
     try {
       const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
-      const apiUrl = `${process.env.REACT_APP_API_URL}${endpoint}`;
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+      const apiUrl = `${baseUrl}${endpoint}`;
       
       console.log('Test 8 - Sending auth request:', {
         url: apiUrl,

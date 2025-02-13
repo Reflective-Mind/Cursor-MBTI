@@ -42,16 +42,6 @@ import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react';
 
-const SOCKET_URL = process.env.NODE_ENV === 'production'
-  ? process.env.REACT_APP_SOCKET_URL
-  : 'http://localhost:5000';
-
-console.log('Environment:', {
-  NODE_ENV: process.env.NODE_ENV,
-  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
-  SOCKET_URL
-});
-
 const Community = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -121,118 +111,98 @@ const Community = () => {
 
   // Initialize socket connection
   useEffect(() => {
+    console.log('Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+      SOCKET_URL: process.env.REACT_APP_SOCKET_URL
+    });
+
     const token = localStorage.getItem('token');
     if (!token) {
       navigate('/login');
       return;
     }
 
-    try {
-      console.log('Test 2 - Initializing socket connection:', {
-        url: SOCKET_URL,
-        token: token ? 'Present' : 'Missing',
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          REACT_APP_API_URL: process.env.REACT_APP_API_URL,
-          REACT_APP_SOCKET_URL: process.env.REACT_APP_SOCKET_URL
-        }
-      });
+    const socketUrl = process.env.REACT_APP_SOCKET_URL?.replace(/\/+$/, '') || '';
+    const socketOptions = {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    };
 
-      const newSocket = io(SOCKET_URL, {
-        auth: { token },
-        transports: ['polling', 'websocket'],
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-        autoConnect: true,
-        withCredentials: true,
-        extraHeaders: {
-          'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin
-        }
-      });
+    const socket = io(socketUrl, socketOptions);
 
-      setSocket(newSocket);
+    setSocket(socket);
 
-      newSocket.on('connect_error', (error) => {
-        console.error('Test 2 - Socket connection error:', {
-          message: error.message,
-          description: error.description,
-          context: {
-            url: SOCKET_URL,
-            token: token ? 'Present' : 'Missing',
-            transport: newSocket.io.engine.transport.name,
-            readyState: newSocket.io.engine.readyState,
-            connected: newSocket.connected,
-            disconnected: newSocket.disconnected
-          }
-        });
-        setError('Test 2 - Failed to connect to chat server. Retrying...');
-      });
-
-      newSocket.on('connect', () => {
-        console.log('Test 2 - Connected to chat server successfully:', {
-          transport: newSocket.io.engine.transport.name,
-          id: newSocket.id
-        });
-        setError(null);
-      });
-
-      newSocket.on('disconnect', (reason) => {
-        console.log('Test 2 - Disconnected from chat server:', {
-          reason,
-          wasConnected: newSocket.connected,
-          transport: newSocket.io.engine.transport?.name
-        });
-        
-        if (reason === 'io server disconnect') {
-          // Server initiated disconnect, try reconnecting
-          console.log('Test 2 - Server initiated disconnect, attempting reconnect');
-          newSocket.connect();
-        }
-      });
-
-      newSocket.on('reconnect', (attemptNumber) => {
-        console.log('Test 2 - Reconnected to chat server:', {
-          attemptNumber,
-          transport: newSocket.io.engine.transport.name
-        });
-        setError(null);
-      });
-
-      newSocket.on('reconnect_error', (error) => {
-        console.error('Test 2 - Socket reconnection error:', {
-          message: error.message,
-          type: error.type,
-          description: error.description
-        });
-        setError('Test 2 - Unable to reconnect to chat server. Please refresh the page.');
-      });
-
-      newSocket.on('user:info', (userInfo) => {
-        console.log('Test 2 - Received user info:', userInfo);
-        newSocket.user = userInfo;
-      });
-
-      return () => {
-        if (newSocket) {
-          console.log('Test 2 - Cleaning up socket connection');
-          newSocket.close();
-        }
-      };
-    } catch (error) {
-      console.error('Test 2 - Socket initialization error:', {
+    socket.on('connect_error', (error) => {
+      console.error('Test 2 - Socket connection error:', {
         message: error.message,
-        stack: error.stack,
+        description: error.description,
         context: {
-          url: SOCKET_URL,
-          token: token ? 'Present' : 'Missing'
+          url: socketUrl,
+          token: token ? 'Present' : 'Missing',
+          transport: socket.io.engine.transport.name,
+          readyState: socket.io.engine.readyState,
+          connected: socket.connected,
+          disconnected: socket.disconnected
         }
       });
-      setError('Test 2 - Failed to initialize chat connection');
-    }
+      setError('Test 2 - Failed to connect to chat server. Retrying...');
+    });
+
+    socket.on('connect', () => {
+      console.log('Test 2 - Connected to chat server successfully:', {
+        transport: socket.io.engine.transport.name,
+        id: socket.id
+      });
+      setError(null);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('Test 2 - Disconnected from chat server:', {
+        reason,
+        wasConnected: socket.connected,
+        transport: socket.io.engine.transport?.name
+      });
+      
+      if (reason === 'io server disconnect') {
+        // Server initiated disconnect, try reconnecting
+        console.log('Test 2 - Server initiated disconnect, attempting reconnect');
+        socket.connect();
+      }
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('Test 2 - Reconnected to chat server:', {
+        attemptNumber,
+        transport: socket.io.engine.transport.name
+      });
+      setError(null);
+    });
+
+    socket.on('reconnect_error', (error) => {
+      console.error('Test 2 - Socket reconnection error:', {
+        message: error.message,
+        type: error.type,
+        description: error.description
+      });
+      setError('Test 2 - Unable to reconnect to chat server. Please refresh the page.');
+    });
+
+    socket.on('user:info', (userInfo) => {
+      console.log('Test 2 - Received user info:', userInfo);
+      socket.user = userInfo;
+    });
+
+    return () => {
+      if (socket) {
+        console.log('Test 2 - Cleaning up socket connection');
+        socket.close();
+      }
+    };
   }, [navigate]);
 
   // Socket event listeners
@@ -366,7 +336,7 @@ const Community = () => {
           env: {
             NODE_ENV: process.env.NODE_ENV,
             REACT_APP_API_URL: process.env.REACT_APP_API_URL,
-            SOCKET_URL
+            SOCKET_URL: process.env.REACT_APP_SOCKET_URL
           }
         });
         setError('Failed to load channels');
