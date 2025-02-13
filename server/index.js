@@ -31,7 +31,11 @@ const corsOptions = {
       'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
       'http://localhost:3000'
     ];
-    console.log('Test 4 - CORS origin check:', { origin, allowed: !origin || allowedOrigins.includes(origin) });
+    console.log('Test 5 - CORS origin check:', { 
+      origin, 
+      allowed: !origin || allowedOrigins.includes(origin),
+      env: process.env.NODE_ENV
+    });
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -47,28 +51,33 @@ const corsOptions = {
   maxAge: 86400
 };
 
-// Apply CORS before any other middleware
+// Apply CORS middleware first
+app.use(cors(corsOptions));
+
+// Add middleware to handle preflight requests
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  if (origin && corsOptions.origin(origin, (err, allowed) => allowed)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
+    res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
+    res.status(204).end();
+  } else {
+    res.status(403).end();
+  }
+});
+
+// Add middleware to set CORS headers for all responses
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && corsOptions.origin(origin, (err, allowed) => allowed)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
-    res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
-    res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
-    res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
-
-    // Handle preflight
-    if (req.method === 'OPTIONS') {
-      res.status(204).end();
-      return;
-    }
   }
   next();
 });
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
 
 // Socket.IO configuration
 const io = socketIo(server, {

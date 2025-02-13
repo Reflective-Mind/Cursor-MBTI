@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { Send as SendIcon, Person as PersonIcon, Psychology as PsychologyIcon } from '@mui/icons-material';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const Chat = () => {
   const [messages, setMessages] = useState([{
@@ -23,8 +24,15 @@ const Chat = () => {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const [mbtiType, setMbtiType] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
     const storedType = localStorage.getItem('mbtiType');
     const storedDetails = localStorage.getItem('mbtiDetails');
     let detailedInfo = null;
@@ -47,7 +55,7 @@ const Chat = () => {
       };
       setMessages([welcomeMessage]);
     }
-  }, []);
+  }, [navigate]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -59,6 +67,13 @@ const Chat = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please log in to continue.');
+      navigate('/login');
+      return;
+    }
 
     const userMessage = {
       role: 'user',
@@ -93,11 +108,15 @@ Detailed assessment results:
         } Provide helpful, personalized advice and insights about MBTI personality types. Keep responses concise and focused on MBTI-related topics.`
       };
 
-      console.log('Test 4 - Sending chat request:', {
+      console.log('Test 5 - Sending chat request:', {
         url: `${process.env.REACT_APP_API_URL}/api/chat/message`,
         messages: messages.length,
-        token: localStorage.getItem('token') ? 'Present' : 'Missing',
-        systemMessage: 'Present'
+        token: token ? 'Present' : 'Missing',
+        systemMessage: 'Present',
+        env: {
+          NODE_ENV: process.env.NODE_ENV,
+          REACT_APP_API_URL: process.env.REACT_APP_API_URL
+        }
       });
 
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/chat/message`, {
@@ -108,7 +127,7 @@ Detailed assessment results:
         ]
       }, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -119,7 +138,7 @@ Detailed assessment results:
         }
       });
 
-      console.log('Test 4 - Chat API response:', {
+      console.log('Test 5 - Chat API response:', {
         status: response.status,
         statusText: response.statusText,
         data: response.data ? {
@@ -129,18 +148,25 @@ Detailed assessment results:
         headers: response.headers
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        setError('Your session has expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+
       if (response.status !== 200 || !response.data) {
-        throw new Error('Test 4 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
+        throw new Error('Test 5 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
       }
 
       if (!response.data.choices?.[0]?.message) {
-        throw new Error('Test 4 - Invalid response format from API');
+        throw new Error('Test 5 - Invalid response format from API');
       }
 
       const assistantMessage = response.data.choices[0].message;
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Test 4 - Chat API Error:', {
+      console.error('Test 5 - Chat API Error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
@@ -153,12 +179,20 @@ Detailed assessment results:
           }
         }
       });
-      setError('Test 4 - Sorry, I encountered an error. Please try again.');
+
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        setError('Your session has expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+
+      setError('Test 5 - Sorry, I encountered an error. Please try again.');
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Test 4 - I apologize, but I encountered an error. Please try again.',
+          content: 'Test 5 - I apologize, but I encountered an error. Please try again.',
         },
       ]);
     } finally {
