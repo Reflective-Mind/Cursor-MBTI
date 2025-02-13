@@ -42,13 +42,8 @@ const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
       'https://cursor-mbti.vercel.app',
-      'https://cursor-mbti-jy10uyzsh-reflective-minds-projects.vercel.app',
-      'https://cursor-mbti-4qxkqwvuk-reflective-minds-projects.vercel.app',
-      'https://cursor-mbti-cp9py8d44-reflective-minds-projects.vercel.app',
-      'https://cursor-mbti-meh28kc3w-reflective-minds-projects.vercel.app',
-      'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
       'http://localhost:3000',
-      'https://cursor-mbti-server.onrender.com'
+      'https://mbti-render.onrender.com'
     ];
     console.log('Test 8 - CORS origin check:', { 
       origin, 
