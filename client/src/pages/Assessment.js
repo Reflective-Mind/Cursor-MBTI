@@ -21,7 +21,6 @@ import {
   Avatar,
   CircularProgress,
   IconButton,
-  Tooltip,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -1386,8 +1385,6 @@ const Assessment = () => {
   const [selectedTest, setSelectedTest] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const messagesEndRef = useRef(null);
@@ -1401,7 +1398,7 @@ const Assessment = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatMessages]);
+  }, [aiMessages]);
 
   const handleTestSelection = (testType) => {
     setSelectedTest(testType);
@@ -1522,6 +1519,8 @@ const Assessment = () => {
   };
 
   const handleAskAI = async () => {
+    if (!aiInput.trim()) return;
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -1529,6 +1528,7 @@ const Assessment = () => {
         return;
       }
 
+      setIsLoading(true);
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await axios.post(`${baseUrl}/api/chat/message`, {
         messages: [
@@ -1537,8 +1537,8 @@ const Assessment = () => {
             content: `You are a concise MBTI assessment helper. Current question category: ${currentQuestion.category}
 
 Question: "${currentQuestion.question}"
-Option A: ${currentQuestion.options[0]}
-Option B: ${currentQuestion.options[1]}
+Option A: ${currentQuestion.options[0].text}
+Option B: ${currentQuestion.options[1].text}
 
 When asked about MBTI concepts:
 1. First give a clear, 1-2 sentence definition of the concept
@@ -1571,6 +1571,8 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
     } catch (error) {
       console.error('Error sending message:', error);
       setError(error.response?.data?.message || 'Failed to get AI response');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1647,7 +1649,7 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
           gap: 2,
           mb: 2
         }}>
-          {chatMessages.map((message, index) => (
+          {aiMessages.map((message, index) => (
             <Box
               key={index}
               sx={{
