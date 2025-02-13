@@ -13,7 +13,6 @@ import Chat from './pages/Chat';
 import Community from './pages/Community';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
-import Test from './pages/Test';
 
 // Create theme
 const theme = createTheme({
@@ -144,7 +143,6 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<Profile />} />
-              <Route path="/test" element={<Test />} />
             </Routes>
           </div>
         </Router>
