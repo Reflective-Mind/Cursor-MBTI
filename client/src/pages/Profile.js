@@ -16,7 +16,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Profile = () => {
-  const { id } = useParams();
+  const { userId } = useParams();
   const { user: currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,18 +29,23 @@ const Profile = () => {
         setLoading(true);
         setError(null);
         
-        // Use the URL parameter id if available, otherwise use the logged-in user's id
-        const userId = id || currentUser?._id;
+        // Use the URL parameter userId if available, otherwise use the logged-in user's id
+        const targetUserId = userId || currentUser?._id;
         
-        if (!userId) {
-          throw new Error('No user ID available. Please log in or provide a user ID.');
+        if (!targetUserId) {
+          throw new Error('Please log in to view profiles');
         }
 
-        console.log(`Fetching profile details for user ${userId}`);
         const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+
+        console.log(`Fetching profile details for user ${targetUserId}`);
         console.log('Token status:', token ? 'present' : 'missing');
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetUserId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
@@ -51,6 +56,11 @@ const Profile = () => {
         console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/login');
+            return;
+          }
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to load profile');
         }
@@ -61,17 +71,40 @@ const Profile = () => {
       } catch (err) {
         console.error('Profile loading error:', err);
         setError(err.message);
+        if (err.message.includes('log in')) {
+          navigate('/login');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchProfile();
-  }, [id, currentUser]);
+  }, [userId, currentUser, navigate]);
 
-  if (loading) return <div>Loading profile...</div>;
-  if (error) return <div className="error-message">{error}</div>;
-  if (!user) return <div>No profile found</div>;
+  if (loading) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 4 }}>
+        <Alert severity="info">Profile not found</Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
