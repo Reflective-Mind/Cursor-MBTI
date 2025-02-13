@@ -130,7 +130,7 @@ const WorldMap = () => {
         varying vec3 vPosition;
 
         void main() {
-          vec4 mapColor = texture2D(texture, vUv);
+          vec4 texColor = texture2D(texture, vUv);
           
           // Enhanced pulsing effect
           float pulse = sin(time * 0.5) * 0.5 + 0.5;
@@ -149,7 +149,7 @@ const WorldMap = () => {
           vec3 accentGlow = vec3(0.2, 0.5, 1.0);
           
           // Enhanced brightness for map points
-          float mapBrightness = mapColor.r * (1.0 + pulse * 0.5);
+          float mapBrightness = texColor.r * (1.0 + pulse * 0.5);
           
           // Create a more dramatic color mix
           vec3 finalColor = mix(baseGlow, accentGlow, mapBrightness);
@@ -162,7 +162,7 @@ const WorldMap = () => {
           finalColor *= 1.5;
           
           // Control transparency
-          float alpha = mapColor.r * 0.8 + lineEffect * 0.2;
+          float alpha = texColor.r * 0.8 + lineEffect * 0.2;
           alpha = clamp(alpha, 0.0, 0.8);
           
           gl_FragColor = vec4(finalColor, alpha);

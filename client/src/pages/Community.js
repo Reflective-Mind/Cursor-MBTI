@@ -43,7 +43,7 @@ import io from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react';
 
 const SOCKET_URL = process.env.NODE_ENV === 'production'
-  ? process.env.REACT_APP_SOCKET_URL || 'https://cursor-mbti-server.onrender.com'
+  ? process.env.REACT_APP_SOCKET_URL
   : 'http://localhost:5000';
 
 console.log('Environment:', {
@@ -90,45 +90,49 @@ const Community = () => {
       return;
     }
 
-    console.log('Initializing socket connection to:', SOCKET_URL);
-    const newSocket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
-    });
-
-    newSocket.on('connect', () => {
-      console.log('Connected to chat server');
-      setSocket(newSocket);
-      setError(null);
-    });
-
-    newSocket.on('user:info', (userInfo) => {
-      console.log('Received user info:', userInfo);
-      newSocket.user = userInfo;
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', {
-        message: error.message,
-        description: error.description,
-        context: {
-          url: SOCKET_URL,
-          token: token ? 'Present' : 'Missing'
-        }
+    try {
+      console.log('Initializing socket connection to:', SOCKET_URL);
+      const newSocket = io(SOCKET_URL, {
+        auth: { token },
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5
       });
-      setError('Failed to connect to chat server');
-    });
 
-    // Clean up socket connection
-    return () => {
-      if (newSocket) {
-        newSocket.close();
-      }
-    };
+      newSocket.on('connect', () => {
+        console.log('Connected to chat server');
+        setSocket(newSocket);
+        setError(null);
+      });
+
+      newSocket.on('user:info', (userInfo) => {
+        console.log('Received user info:', userInfo);
+        newSocket.user = userInfo;
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.error('Socket connection error:', {
+          message: error.message,
+          description: error.description,
+          context: {
+            url: SOCKET_URL,
+            token: token ? 'Present' : 'Missing'
+          }
+        });
+        setError('Failed to connect to chat server');
+      });
+
+      return () => {
+        if (newSocket) {
+          newSocket.close();
+        }
+      };
+    } catch (error) {
+      console.error('Socket initialization error:', error);
+      setError('Failed to initialize chat connection');
+    }
   }, [navigate]);
 
   // Socket event listeners
