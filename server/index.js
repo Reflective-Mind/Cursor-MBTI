@@ -1,4 +1,22 @@
-require('dotenv').config();
+// Load environment variables based on NODE_ENV
+console.log('Current NODE_ENV:', process.env.NODE_ENV);
+console.log('Current directory:', process.cwd());
+
+if (process.env.NODE_ENV === 'production') {
+  console.log('Loading production environment from:', './.env.production');
+  require('dotenv').config({ path: './.env.production' });
+} else {
+  console.log('Loading development environment');
+  require('dotenv').config();
+}
+
+console.log('Environment variables loaded:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  MONGODB_URI: process.env.MONGODB_URI ? 'Present' : 'Missing',
+  JWT_SECRET: process.env.JWT_SECRET ? 'Present' : 'Missing'
+});
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -29,12 +47,17 @@ const corsOptions = {
       'https://cursor-mbti-cp9py8d44-reflective-minds-projects.vercel.app',
       'https://cursor-mbti-meh28kc3w-reflective-minds-projects.vercel.app',
       'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
-      'http://localhost:3000'
+      'http://localhost:3000',
+      'https://cursor-mbti-server.onrender.com'
     ];
-    console.log('Test 7 - CORS origin check:', { 
+    console.log('Test 8 - CORS origin check:', { 
       origin, 
       allowed: !origin || allowedOrigins.includes(origin),
-      env: process.env.NODE_ENV
+      env: process.env.NODE_ENV,
+      headers: {
+        'content-type': 'application/json',
+        'accept': 'application/json'
+      }
     });
 
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -69,15 +92,17 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   
   // Log the request details for debugging
-  console.log('Test 7 - Request details:', {
+  console.log('Test 8 - Request details:', {
     method: req.method,
     url: req.url,
     origin: origin,
+    path: req.path,
     headers: {
       'content-type': req.headers['content-type'],
       'accept': req.headers.accept,
       'authorization': req.headers.authorization ? 'Present' : 'Missing'
-    }
+    },
+    env: process.env.NODE_ENV
   });
 
   if (origin) {

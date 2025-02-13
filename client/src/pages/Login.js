@@ -40,7 +40,7 @@ const Login = () => {
       const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
       const apiUrl = `${process.env.REACT_APP_API_URL}${endpoint}`;
       
-      console.log('Test 7 - Sending auth request:', {
+      console.log('Test 8 - Sending auth request:', {
         url: apiUrl,
         method: 'POST',
         formData: {
@@ -50,6 +50,10 @@ const Login = () => {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
+        },
+        env: {
+          NODE_ENV: process.env.NODE_ENV,
+          REACT_APP_API_URL: process.env.REACT_APP_API_URL
         }
       });
       
@@ -64,19 +68,23 @@ const Login = () => {
         body: JSON.stringify(formData)
       });
 
-      console.log('Test 7 - Auth API response status:', {
+      console.log('Test 8 - Auth API response status:', {
         status: response.status,
         ok: response.ok,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
+        headers: Object.fromEntries(response.headers.entries()),
+        env: {
+          NODE_ENV: process.env.NODE_ENV,
+          REACT_APP_API_URL: process.env.REACT_APP_API_URL
+        }
       });
 
       if (response.status === 404) {
-        throw new Error('Test 7 - Authentication service is not available. Please try again later.');
+        throw new Error('Test 8 - Authentication service is not available. Please try again later.');
       }
 
       if (response.status === 403) {
-        throw new Error('Test 7 - Access denied. Please check your connection and try again.');
+        throw new Error('Test 8 - Access denied. Please check your connection and try again.');
       }
 
       const contentType = response.headers.get('content-type');
@@ -85,11 +93,11 @@ const Login = () => {
       try {
         data = await response.json();
       } catch (error) {
-        console.error('Test 7 - Error parsing response:', error);
-        throw new Error('Test 7 - Invalid response from server. Please try again.');
+        console.error('Test 8 - Error parsing response:', error);
+        throw new Error('Test 8 - Invalid response from server. Please try again.');
       }
 
-      console.log('Test 7 - Auth API response data:', {
+      console.log('Test 8 - Auth API response data:', {
         status: response.status,
         ok: response.ok,
         contentType,
@@ -98,18 +106,18 @@ const Login = () => {
       });
 
       if (!response.ok) {
-        throw new Error(data.message || data.details || `Test 7 - Authentication failed with status ${response.status}`);
+        throw new Error(data.message || data.details || `Test 8 - Authentication failed with status ${response.status}`);
       }
 
       if (!data.token) {
-        throw new Error('Test 7 - No token received from server');
+        throw new Error('Test 8 - No token received from server');
       }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
       navigate('/community');
     } catch (error) {
-      console.error('Test 7 - Auth error:', {
+      console.error('Test 8 - Auth error:', {
         message: error.message,
         formData: {
           ...formData,
@@ -124,12 +132,12 @@ const Login = () => {
 
       let errorMessage = error.message;
       if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-        errorMessage = 'Test 7 - Unable to connect to the server. Please check your connection and try again.';
+        errorMessage = 'Test 8 - Unable to connect to the server. Please check your connection and try again.';
       } else if (error.message.includes('CORS')) {
-        errorMessage = 'Test 7 - Connection error. Please try again later.';
+        errorMessage = 'Test 8 - Connection error. Please try again later.';
       }
 
-      setError(errorMessage || 'Test 7 - Authentication failed. Please try again.');
+      setError(errorMessage || 'Test 8 - Authentication failed. Please try again.');
     }
   };
 
