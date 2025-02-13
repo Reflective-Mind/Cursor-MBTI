@@ -1391,6 +1391,9 @@ const Assessment = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const messagesEndRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiInput, setAiInput] = useState('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1518,49 +1521,24 @@ const Assessment = () => {
     }
   };
 
-  const handleAskAI = (question) => {
-    setCurrentQuestion(question);
-    setIsChatOpen(true);
-    // Initialize chat with context about the current question
-    setChatMessages([{
-      role: 'assistant',
-      content: `I'll help you decide on the question: "${question.text}". What specific aspects would you like me to clarify?`
-    }]);
-  };
-
-  const handleSendMessage = async () => {
-    if (!currentInput.trim()) return;
-
-    const userMessage = {
-      role: 'user',
-      content: currentInput,
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
-    setCurrentInput('');
-    setIsLoading(true);
-
+  const handleAskAI = async () => {
     try {
-      // Get the category context
-      const category = questions.find(cat => 
-        cat.questions.some(q => q.id === currentQuestion.id)
-      );
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Please log in to use the AI helper');
+        return;
+      }
 
-      // Create category-specific guidance
-      const categoryGuidance = {
-        'Extraversion (E) vs. Introversion (I)': 'Think about your energy levels in different situations.',
-        'Sensing (S) vs. Intuition (N)': 'Consider how you naturally process information and learn.',
-        'Thinking (T) vs. Feeling (F)': 'Reflect on your decision-making process.',
-        'Judging (J) vs. Perceiving (P)': 'Think about how you prefer to structure your life.',
-      };
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+      const response = await axios.post(`${baseUrl}/api/chat/message`, {
+        messages: [
+          {
+            role: 'system',
+            content: `You are a concise MBTI assessment helper. Current question category: ${currentQuestion.category}
 
-      const systemMessage = {
-        role: 'system',
-        content: `You are a concise MBTI assessment helper. Current question category: ${category.category}
-
-Question: "${currentQuestion.text}"
-Option A: ${currentQuestion.options[0].text}
-Option B: ${currentQuestion.options[1].text}
+Question: "${currentQuestion.question}"
+Option A: ${currentQuestion.options[0]}
+Option B: ${currentQuestion.options[1]}
 
 When asked about MBTI concepts:
 1. First give a clear, 1-2 sentence definition of the concept
@@ -1570,27 +1548,29 @@ When asked about MBTI concepts:
 Keep total response under 4 sentences. Be direct and clear. Don't use complex terminology.
 
 If the user asks "What does [concept] mean?", respond with just steps 1-2 above (definition and example).`
-      };
-
-      const response = await axios.post('/api/chat/message', {
-        messages: [
-          systemMessage,
-          ...chatMessages,
-          userMessage
-        ],
+          },
+          ...aiMessages,
+          { role: 'user', content: aiInput }
+        ]
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
 
-      if (response.data.choices && response.data.choices[0]?.message) {
-        setChatMessages(prev => [...prev, response.data.choices[0].message]);
+      if (response.data.choices && response.data.choices[0]) {
+        setAiMessages(prev => [
+          ...prev,
+          { role: 'user', content: aiInput },
+          response.data.choices[0].message
+        ]);
+        setAiInput('');
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'I apologize, but I encountered an error. Please try again.'
-      }]);
-    } finally {
-      setIsLoading(false);
+      setError(error.response?.data?.message || 'Failed to get AI response');
     }
   };
 
@@ -1621,7 +1601,10 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
       </FormControl>
       <Button
         startIcon={<HelpIcon />}
-        onClick={() => handleAskAI(question)}
+        onClick={() => {
+          setCurrentQuestion(question);
+          setIsChatOpen(true);
+        }}
         variant="text"
         color="secondary"
         sx={{ mt: 1 }}
@@ -1717,8 +1700,8 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
             fullWidth
             multiline
             maxRows={4}
-            value={currentInput}
-            onChange={(e) => setCurrentInput(e.target.value)}
+            value={aiInput}
+            onChange={(e) => setAiInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Type your message..."
             variant="outlined"
@@ -1727,8 +1710,8 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
           />
           <Button
             variant="contained"
-            onClick={handleSendMessage}
-            disabled={!currentInput.trim() || isLoading}
+            onClick={handleAskAI}
+            disabled={!aiInput.trim() || isLoading}
             sx={{ minWidth: 100 }}
           >
             {isLoading ? (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Paper,
@@ -10,11 +10,12 @@ import {
   Tabs,
   Alert,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [tab, setTab] = useState(0);
   const [formData, setFormData] = useState({
@@ -24,6 +25,9 @@ const Login = () => {
     mbtiType: ''
   });
   const [error, setError] = useState(null);
+
+  // Get the return URL from the location state or default to '/community'
+  const from = location.state?.from?.pathname || '/community';
 
   const handleTabChange = (event, newValue) => {
     setTab(newValue);
@@ -118,7 +122,9 @@ const Login = () => {
 
       login(data.user, data.token);
       localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
-      navigate('/community');
+      
+      // Navigate to the original destination
+      navigate(from, { replace: true });
     } catch (error) {
       console.error('Test 8 - Auth error:', {
         message: error.message,

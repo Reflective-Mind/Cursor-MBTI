@@ -12,7 +12,7 @@ import {
   Card,
   CardContent,
 } from '@mui/material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Profile = () => {
@@ -22,6 +22,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -38,7 +39,11 @@ const Profile = () => {
 
         const token = localStorage.getItem('token');
         if (!token) {
-          navigate('/login');
+          // Navigate to login with return path
+          navigate('/login', { 
+            state: { from: location },
+            replace: true 
+          });
           return;
         }
 
@@ -58,7 +63,10 @@ const Profile = () => {
         if (!response.ok) {
           if (response.status === 401) {
             localStorage.removeItem('token');
-            navigate('/login');
+            navigate('/login', { 
+              state: { from: location },
+              replace: true 
+            });
             return;
           }
           const errorData = await response.json();
@@ -72,7 +80,10 @@ const Profile = () => {
         console.error('Profile loading error:', err);
         setError(err.message);
         if (err.message.includes('log in')) {
-          navigate('/login');
+          navigate('/login', { 
+            state: { from: location },
+            replace: true 
+          });
         }
       } finally {
         setLoading(false);
@@ -80,7 +91,7 @@ const Profile = () => {
     };
 
     fetchProfile();
-  }, [userId, currentUser, navigate]);
+  }, [userId, currentUser, navigate, location]);
 
   if (loading) {
     return (
