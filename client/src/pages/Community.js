@@ -43,8 +43,14 @@ import io from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react';
 
 const SOCKET_URL = process.env.NODE_ENV === 'production'
-  ? 'https://your-production-domain.com'
+  ? process.env.REACT_APP_SOCKET_URL || 'https://cursor-mbti-server.onrender.com'
   : 'http://localhost:5000';
+
+console.log('Environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+  SOCKET_URL
+});
 
 const Community = () => {
   const theme = useTheme();
@@ -84,6 +90,7 @@ const Community = () => {
       return;
     }
 
+    console.log('Initializing socket connection to:', SOCKET_URL);
     const newSocket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket'],
@@ -105,7 +112,14 @@ const Community = () => {
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
+      console.error('Socket connection error:', {
+        message: error.message,
+        description: error.description,
+        context: {
+          url: SOCKET_URL,
+          token: token ? 'Present' : 'Missing'
+        }
+      });
       setError('Failed to connect to chat server');
     });
 
@@ -210,18 +224,31 @@ const Community = () => {
     const fetchChannels = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/community/channels', {
+        const token = localStorage.getItem('token');
+        console.log('Fetching channels:', {
+          url: `${process.env.REACT_APP_API_URL}/api/community/channels`,
+          token: token ? 'Present' : 'Missing'
+        });
+
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/community/channels`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
         
+        const data = await response.json();
+        console.log('Channels API response:', {
+          status: response.status,
+          ok: response.ok,
+          data,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch channels');
+          throw new Error(data.message || 'Failed to fetch channels');
         }
         
-        const data = await response.json();
-        console.log('Fetched channels:', data.channels);
         setChannels(data.channels);
         
         // Auto-join first channel if we have channels and socket
@@ -229,7 +256,14 @@ const Community = () => {
           handleChannelSelect(data.channels[0]);
         }
       } catch (error) {
-        console.error('Error fetching channels:', error);
+        console.error('Error fetching channels:', {
+          message: error.message,
+          env: {
+            NODE_ENV: process.env.NODE_ENV,
+            REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+            SOCKET_URL
+          }
+        });
         setError('Failed to load channels');
       } finally {
         setIsLoading(false);
@@ -239,9 +273,10 @@ const Community = () => {
     if (socket) {
       fetchChannels();
     }
-  }, [socket]);
+  }, [socket, handleChannelSelect]);
 
-  const handleChannelSelect = (channel) => {
+  // Move handleChannelSelect before the useEffect and wrap it in useCallback
+  const handleChannelSelect = React.useCallback((channel) => {
     console.log('Selecting channel:', channel);
     setCurrentChannel(channel);
     setError(null);
@@ -265,7 +300,7 @@ const Community = () => {
       // Join new channel
       socket.emit('channel:join', channel._id);
     }
-  };
+  }, [socket, currentChannel, channelMessages]);
 
   const handleSendMessage = (e) => {
     e?.preventDefault();

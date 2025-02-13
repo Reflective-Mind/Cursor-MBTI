@@ -40,28 +40,67 @@ const upload = multer({
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, mbtiType } = req.body;
+    console.log('Register request received:', {
+      body: {
+        email: req.body.email,
+        username: req.body.username,
+        mbtiType: req.body.mbtiType
+      },
+      headers: {
+        'content-type': req.headers['content-type'],
+        'origin': req.headers.origin,
+        'accept': req.headers.accept
+      }
+    });
+
+    const { email, password, username, mbtiType } = req.body;
+
+    // Enhanced input validation
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ message: 'Valid email is required' });
+    }
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+    if (!username || typeof username !== 'string' || username.length < 3) {
+      return res.status(400).json({ message: 'Username must be at least 3 characters long' });
+    }
+    if (!mbtiType || typeof mbtiType !== 'string' || !mbtiType.match(/^[IE][NS][FT][JP]$/)) {
+      return res.status(400).json({ message: 'Valid MBTI type is required' });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ 
-      $or: [{ email }, { username }] 
+      $or: [
+        { email: email.toLowerCase() },
+        { username: username }
+      ]
     });
-
+    
     if (existingUser) {
       return res.status(400).json({ 
-        message: 'User with this email or username already exists' 
+        message: existingUser.email === email.toLowerCase() 
+          ? 'Email already registered' 
+          : 'Username already taken'
       });
     }
 
     // Create new user
     const user = new User({
-      username,
-      email,
+      email: email.toLowerCase(),
       password,
-      mbtiType
+      username,
+      mbtiType,
+      status: 'online',
+      lastActive: new Date()
     });
 
     await user.save();
+    console.log('User created successfully:', {
+      id: user._id,
+      email: user.email,
+      username: user.username
+    });
 
     // Add user to all public channels
     const publicChannels = await Channel.find({ isPrivate: false });
@@ -85,15 +124,39 @@ router.post('/register', async (req, res) => {
       user: user.getPublicProfile()
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Error registering user' });
+    console.error('Register error:', {
+      message: error.message,
+      stack: error.stack,
+      body: {
+        ...req.body,
+        password: '[REDACTED]'
+      },
+      headers: req.headers
+    });
+    res.status(500).json({ 
+      message: 'Error registering user', 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 
 // Login user
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login request received:', {
+      email: req.body.email,
+      headers: {
+        'content-type': req.headers['content-type'],
+        origin: req.headers.origin
+      }
+    });
+
     const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
 
     // Find user
     const user = await User.findOne({ email });
@@ -119,13 +182,22 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    console.log('Login successful:', {
+      userId: user._id,
+      email: user.email
+    });
+
     res.json({
       token,
       user: user.getPublicProfile()
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Error logging in' });
+    console.error('Login error:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+    res.status(500).json({ message: 'Error logging in', details: error.message });
   }
 });
 

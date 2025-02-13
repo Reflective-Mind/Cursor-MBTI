@@ -93,13 +93,37 @@ Detailed assessment results:
         } Provide helpful, personalized advice and insights about MBTI personality types. Keep responses concise and focused on MBTI-related topics.`
       };
 
-      const response = await axios.post('/api/chat/message', {
+      console.log('Sending chat request:', {
+        url: `${process.env.REACT_APP_API_URL}/api/chat/message`,
+        messages: messages.length,
+        token: localStorage.getItem('token') ? 'Present' : 'Missing'
+      });
+
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/chat/message`, {
         messages: [
           systemMessage,
           ...messages,
           userMessage
-        ],
+        ]
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        validateStatus: function (status) {
+          return true; // Don't reject any status codes
+        }
       });
+
+      console.log('Chat API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data ? 'Present' : 'Missing'
+      });
+
+      if (response.status !== 200) {
+        throw new Error(response.data?.message || response.data?.details || 'Chat API error');
+      }
 
       if (response.data.choices && response.data.choices[0]?.message) {
         setMessages((prev) => [...prev, response.data.choices[0].message]);
@@ -107,7 +131,12 @@ Detailed assessment results:
         throw new Error('Invalid response format from API');
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Chat API Error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        config: error.config
+      });
       setError('Sorry, I encountered an error. Please try again.');
       setMessages((prev) => [
         ...prev,

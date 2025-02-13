@@ -38,26 +38,73 @@ const Login = () => {
 
     try {
       const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}`, {
+      const apiUrl = `${process.env.REACT_APP_API_URL}${endpoint}`;
+      
+      console.log('Sending auth request:', {
+        url: apiUrl,
+        method: 'POST',
+        formData: {
+          ...formData,
+          password: '[REDACTED]'
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify(formData),
-        credentials: 'include'
+        credentials: 'include',
+        body: JSON.stringify(formData)
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        throw new Error('Server response was not JSON');
+      }
+
+      console.log('Auth API response:', {
+        status: response.status,
+        ok: response.ok,
+        contentType,
+        data: data.token ? { ...data, token: '[REDACTED]' } : data,
+        headers: Object.fromEntries(response.headers.entries())
+      });
 
       if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed');
+        throw new Error(data.message || data.details || `Authentication failed with status ${response.status}`);
+      }
+
+      if (!data.token) {
+        throw new Error('No token received from server');
       }
 
       localStorage.setItem('token', data.token);
+      localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
       navigate('/community');
     } catch (error) {
-      console.error('Auth error:', error);
-      setError(error.message || 'Authentication failed');
+      console.error('Auth error:', {
+        message: error.message,
+        formData: {
+          ...formData,
+          password: '[REDACTED]'
+        },
+        endpoint: tab === 0 ? 'login' : 'register',
+        env: {
+          NODE_ENV: process.env.NODE_ENV,
+          REACT_APP_API_URL: process.env.REACT_APP_API_URL
+        }
+      });
+      setError(error.message || 'Authentication failed. Please try again.');
     }
   };
 

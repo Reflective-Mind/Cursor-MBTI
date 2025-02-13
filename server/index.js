@@ -14,26 +14,53 @@ const Message = require('./models/Message');
 // Initialize express app
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ['https://cursor-mbti.vercel.app', 'http://localhost:3000']
-      : 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors({
+
+// CORS configuration
+const corsOptions = {
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://cursor-mbti.vercel.app', 'http://localhost:3000']
+    ? [
+        'https://cursor-mbti.vercel.app',
+        'https://cursor-mbti-jy10uyzsh-reflective-minds-projects.vercel.app',
+        'https://cursor-mbti-4qxkqwvuk-reflective-minds-projects.vercel.app',
+        'https://cursor-mbti-cp9py8d44-reflective-minds-projects.vercel.app',
+        'https://cursor-mbti-meh28kc3w-reflective-minds-projects.vercel.app',
+        'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
+        'http://localhost:3000'
+      ]
     : 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  maxAge: 86400 // 24 hours
+};
+
+// Apply CORS before other middleware
+app.use(cors(corsOptions));
+
+// Socket.IO CORS
+const socketCorsOptions = {
+  ...corsOptions,
+  methods: ['GET', 'POST']
+};
+
+const io = socketIo(server, {
+  cors: socketCorsOptions,
+  path: '/socket.io'
+});
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false
 }));
-app.use(helmet());
 app.use(morgan('dev'));
 
 // Serve uploaded files

@@ -30,4 +30,16 @@ yarn-error.log*
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+REACT_APP_API_URL=<your-backend-url-once-deployed>
+REACT_APP_SOCKET_URL=<your-backend-url-once-deployed>
+REACT_APP_LECHAT_API_KEY=pjTVzQVIZyYNzWj7mjm5aysVYippTADy
+
+LECHAT_API_ENDPOINT=<lechat-api-endpoint>
+LECHAT_API_KEY=<your-lechat-api-key>
+
+PORT=5000
+MONGODB_URI=<your-production-mongodb-uri>
+JWT_SECRET=<your-production-jwt-secret>
+NODE_ENV=production 
