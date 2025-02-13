@@ -6,21 +6,25 @@ const axios = require('axios');
 // Send message to chat
 router.post('/message', auth, async (req, res) => {
   try {
-    console.log('Received chat request:', {
+    console.log('Test 1 - Received chat request:', {
       messages: req.body.messages?.length,
       token: req.headers.authorization ? 'Present' : 'Missing',
-      apiKey: process.env.LECHAT_API_KEY ? 'Present' : 'Missing'
+      apiKey: process.env.LECHAT_API_KEY ? 'Present' : 'Missing',
+      apiEndpoint: process.env.LECHAT_API_ENDPOINT || '/v1/chat/completions'
     });
 
     if (!process.env.LECHAT_API_KEY) {
-      throw new Error('Missing LeChat API configuration');
+      throw new Error('Test 1 - Missing LeChat API configuration');
     }
 
     if (!req.body.messages || !Array.isArray(req.body.messages)) {
-      throw new Error('Invalid messages format');
+      throw new Error('Test 1 - Invalid messages format');
     }
 
-    const response = await axios.post('https://api.lechat.ai/v1/chat/completions', {
+    const apiUrl = 'https://api.lechat.ai/v1/chat/completions';
+    console.log('Test 1 - Making request to:', apiUrl);
+
+    const response = await axios.post(apiUrl, {
       model: "gpt-3.5-turbo",
       messages: req.body.messages,
       temperature: 0.7,
@@ -39,20 +43,25 @@ router.post('/message', auth, async (req, res) => {
       }
     });
 
-    console.log('LeChat API response:', {
+    console.log('Test 1 - LeChat API response:', {
       status: response.status,
       statusText: response.statusText,
-      data: response.data ? 'Present' : 'Missing',
+      hasData: Boolean(response.data),
+      hasChoices: Boolean(response.data?.choices),
       error: response.data?.error
     });
 
-    if (response.status !== 200) {
-      throw new Error(response.data?.error?.message || response.data?.error || 'LeChat API error');
+    if (response.status !== 200 || !response.data) {
+      throw new Error('Test 1 - ' + (response.data?.error?.message || response.data?.error || 'LeChat API error'));
+    }
+
+    if (!response.data.choices?.[0]?.message) {
+      throw new Error('Test 1 - Invalid response format from API');
     }
     
     res.status(200).json(response.data);
   } catch (error) {
-    console.error('Chat API Error Details:', {
+    console.error('Test 1 - Chat API Error Details:', {
       message: error.message,
       response: {
         status: error.response?.status,
@@ -61,13 +70,14 @@ router.post('/message', auth, async (req, res) => {
       },
       config: {
         url: error.config?.url,
+        method: error.config?.method,
         headers: error.config?.headers,
         data: error.config?.data
       }
     });
     
     res.status(error.response?.status || 500).json({ 
-      message: 'Error processing chat request',
+      message: 'Test 1 - Error processing chat request',
       details: error.response?.data?.error?.message || error.message
     });
   }
