@@ -1579,7 +1579,7 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleAskAI();
     }
   };
 
