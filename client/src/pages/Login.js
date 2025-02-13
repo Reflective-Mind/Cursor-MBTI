@@ -40,7 +40,7 @@ const Login = () => {
       const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
       const apiUrl = `${process.env.REACT_APP_API_URL}${endpoint}`;
       
-      console.log('Sending auth request:', {
+      console.log('Test 7 - Sending auth request:', {
         url: apiUrl,
         method: 'POST',
         formData: {
@@ -60,19 +60,36 @@ const Login = () => {
           'Accept': 'application/json'
         },
         credentials: 'include',
+        mode: 'cors',
         body: JSON.stringify(formData)
       });
+
+      console.log('Test 7 - Auth API response status:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (response.status === 404) {
+        throw new Error('Test 7 - Authentication service is not available. Please try again later.');
+      }
+
+      if (response.status === 403) {
+        throw new Error('Test 7 - Access denied. Please check your connection and try again.');
+      }
 
       const contentType = response.headers.get('content-type');
       let data;
       
-      if (contentType && contentType.includes('application/json')) {
+      try {
         data = await response.json();
-      } else {
-        throw new Error('Server response was not JSON');
+      } catch (error) {
+        console.error('Test 7 - Error parsing response:', error);
+        throw new Error('Test 7 - Invalid response from server. Please try again.');
       }
 
-      console.log('Auth API response:', {
+      console.log('Test 7 - Auth API response data:', {
         status: response.status,
         ok: response.ok,
         contentType,
@@ -81,18 +98,18 @@ const Login = () => {
       });
 
       if (!response.ok) {
-        throw new Error(data.message || data.details || `Authentication failed with status ${response.status}`);
+        throw new Error(data.message || data.details || `Test 7 - Authentication failed with status ${response.status}`);
       }
 
       if (!data.token) {
-        throw new Error('No token received from server');
+        throw new Error('Test 7 - No token received from server');
       }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
       navigate('/community');
     } catch (error) {
-      console.error('Auth error:', {
+      console.error('Test 7 - Auth error:', {
         message: error.message,
         formData: {
           ...formData,
@@ -104,7 +121,15 @@ const Login = () => {
           REACT_APP_API_URL: process.env.REACT_APP_API_URL
         }
       });
-      setError(error.message || 'Authentication failed. Please try again.');
+
+      let errorMessage = error.message;
+      if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+        errorMessage = 'Test 7 - Unable to connect to the server. Please check your connection and try again.';
+      } else if (error.message.includes('CORS')) {
+        errorMessage = 'Test 7 - Connection error. Please try again later.';
+      }
+
+      setError(errorMessage || 'Test 7 - Authentication failed. Please try again.');
     }
   };
 

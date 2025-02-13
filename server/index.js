@@ -31,15 +31,22 @@ const corsOptions = {
       'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
       'http://localhost:3000'
     ];
-    console.log('Test 5 - CORS origin check:', { 
+    console.log('Test 7 - CORS origin check:', { 
       origin, 
       allowed: !origin || allowedOrigins.includes(origin),
       env: process.env.NODE_ENV
     });
-    if (!origin || allowedOrigins.includes(origin)) {
+
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true,
@@ -55,28 +62,39 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Add middleware to handle preflight requests
-app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  if (origin && corsOptions.origin(origin, (err, allowed) => allowed)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
-    res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
-    res.status(204).end();
-  } else {
-    res.status(403).end();
-  }
-});
+app.options('*', cors(corsOptions));
 
 // Add middleware to set CORS headers for all responses
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && corsOptions.origin(origin, (err, allowed) => allowed)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Log the request details for debugging
+  console.log('Test 7 - Request details:', {
+    method: req.method,
+    url: req.url,
+    origin: origin,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'accept': req.headers.accept,
+      'authorization': req.headers.authorization ? 'Present' : 'Missing'
+    }
+  });
+
+  if (origin) {
+    corsOptions.origin(origin, (err, allowed) => {
+      if (allowed) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
+        res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
+        res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
+        res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
+      }
+      next();
+    });
+  } else {
+    next();
   }
-  next();
 });
 
 // Socket.IO configuration
@@ -412,8 +430,32 @@ app.use('/api/users', require('./routes/users'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  console.error('Server error:', {
+    message: err.message,
+    stack: err.stack,
+    headers: req.headers,
+    method: req.method,
+    url: req.url,
+    origin: req.headers.origin,
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT
+    }
+  });
+
+  if (err.message.includes('CORS')) {
+    return res.status(403).json({
+      message: 'CORS error',
+      details: err.message,
+      origin: req.headers.origin,
+      allowedOrigins: corsOptions.allowedOrigins
+    });
+  }
+
+  res.status(500).json({
+    message: 'Something went wrong!',
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 // Start server
