@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const axios = require('axios');
+const { Mistral } = require('@mistralai/mistralai');
 
 // Send message to chat
 router.post('/message', auth, async (req, res) => {
@@ -21,8 +21,7 @@ router.post('/message', auth, async (req, res) => {
         lastMessage: req.body.messages?.[req.body.messages?.length - 1]?.content?.substring(0, 50)
       },
       env: {
-        apiKey: process.env.LECHAT_API_KEY ? 'Present' : 'Missing',
-        apiEndpoint: process.env.LECHAT_API_ENDPOINT,
+        apiKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing',
         nodeEnv: process.env.NODE_ENV
       },
       user: req.user ? {
@@ -35,77 +34,53 @@ router.post('/message', auth, async (req, res) => {
       return res.status(401).json({ message: 'Test 5 - Authentication required' });
     }
 
-    if (!process.env.LECHAT_API_KEY) {
-      throw new Error('Test 5 - LeChat API key is missing');
+    if (!process.env.MISTRAL_API_KEY) {
+      throw new Error('Test 5 - Mistral API key is missing');
     }
 
     if (!req.body.messages || !Array.isArray(req.body.messages)) {
       throw new Error('Test 5 - Invalid messages format');
     }
 
-    const apiUrl = 'https://api.lechat.ai/v1/chat/completions';
-    console.log('Test 5 - Making request to LeChat API:', {
-      url: apiUrl,
+    const client = new Mistral(process.env.MISTRAL_API_KEY);
+    const model = "mistral-large-latest";
+
+    console.log('Test 5 - Making request to Mistral API:', {
+      model,
       messageCount: req.body.messages.length,
-      apiKey: process.env.LECHAT_API_KEY ? 'Present' : 'Missing'
+      apiKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing'
     });
 
-    const response = await axios.post(apiUrl, {
-      model: "gpt-3.5-turbo",
+    const response = await client.chat({
+      model,
       messages: req.body.messages.map(msg => ({
         role: msg.role,
         content: msg.content
       })),
       temperature: 0.7,
       max_tokens: 1000,
-      presence_penalty: 0.6,
-      frequency_penalty: 0.5
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.LECHAT_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      timeout: 30000,
-      validateStatus: function (status) {
-        return status >= 200 && status < 500;
-      }
+      top_p: 1,
+      safe_prompt: true
     });
 
-    console.log('Test 5 - LeChat API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      hasData: Boolean(response.data),
-      hasChoices: Boolean(response.data?.choices),
-      firstChoice: response.data?.choices?.[0]?.message?.content?.substring(0, 50),
-      error: response.data?.error
+    console.log('Test 5 - Mistral API response:', {
+      hasChoices: Boolean(response.choices),
+      firstChoice: response.choices?.[0]?.message?.content?.substring(0, 50)
     });
 
-    if (response.status !== 200 || !response.data) {
-      throw new Error('Test 5 - ' + (response.data?.error?.message || response.data?.error || 'LeChat API error'));
-    }
-
-    if (!response.data.choices?.[0]?.message) {
+    if (!response.choices?.[0]?.message) {
       throw new Error('Test 5 - Invalid response format from API');
     }
     
-    res.status(200).json(response.data);
+    res.status(200).json({
+      choices: [{
+        message: response.choices[0].message
+      }]
+    });
   } catch (error) {
     console.error('Test 5 - Chat API Error Details:', {
       message: error.message,
-      response: {
-        status: error.response?.status,
-        data: error.response?.data,
-        headers: error.response?.headers
-      },
-      request: {
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: {
-          ...error.config?.headers,
-          Authorization: error.config?.headers?.Authorization ? 'Present' : 'Missing'
-        }
-      },
+      response: error.response,
       stack: error.stack,
       user: req.user ? {
         userId: req.user.userId,
@@ -113,12 +88,11 @@ router.post('/message', auth, async (req, res) => {
       } : null
     });
     
-    const statusCode = error.response?.status || 500;
+    const statusCode = error.status || 500;
     res.status(statusCode).json({ 
       message: 'Test 5 - Error processing chat request',
-      details: error.response?.data?.error?.message || error.message,
+      details: error.message,
       errorType: error.name,
-      path: error.config?.url || 'unknown',
       status: statusCode
     });
   }
