@@ -41,7 +41,40 @@ app.use('/uploads', express.static('uploads'));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(async () => {
+    console.log('Connected to MongoDB');
+    
+    // Initialize channels if none exist
+    const channelCount = await Channel.countDocuments();
+    if (channelCount === 0) {
+      const defaultChannels = [
+        {
+          name: 'general',
+          description: 'General discussion for all MBTI types',
+          category: 'general',
+          type: 'text'
+        },
+        {
+          name: 'introvert-corner',
+          description: 'A cozy space for introverts to connect',
+          category: 'mbti-types',
+          type: 'text'
+        },
+        {
+          name: 'extrovert-plaza',
+          description: 'High-energy discussions for extroverts',
+          category: 'mbti-types',
+          type: 'text'
+        }
+      ];
+
+      for (const channelData of defaultChannels) {
+        const channel = new Channel(channelData);
+        await channel.save();
+        console.log(`Created channel: ${channel.name}`);
+      }
+    }
+  })
   .catch((err) => console.error('MongoDB connection error:', err));
 
 // Socket.IO Authentication Middleware
