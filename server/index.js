@@ -441,6 +441,14 @@ io.on('connection', async (socket) => {
 });
 
 // Routes
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'MBTI Server is running',
+    env: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/personality', require('./routes/personality'));
 app.use('/api/insights', require('./routes/insights'));
