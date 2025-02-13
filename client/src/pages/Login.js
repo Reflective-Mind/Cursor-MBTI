@@ -38,12 +38,13 @@ const Login = () => {
 
     try {
       const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -55,7 +56,8 @@ const Login = () => {
       localStorage.setItem('token', data.token);
       navigate('/community');
     } catch (error) {
-      setError(error.message);
+      console.error('Auth error:', error);
+      setError(error.message || 'Authentication failed');
     }
   };
 
