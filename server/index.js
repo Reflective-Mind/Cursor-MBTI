@@ -17,7 +17,7 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? 'https://your-production-domain.com' 
+      ? ['https://cursor-mbti.vercel.app', 'http://localhost:3000']
       : 'http://localhost:3000',
     methods: ['GET', 'POST'],
     credentials: true
@@ -27,7 +27,12 @@ const io = socketIo(server, {
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://cursor-mbti.vercel.app', 'http://localhost:3000']
+    : 'http://localhost:3000',
+  credentials: true
+}));
 app.use(helmet());
 app.use(morgan('dev'));
 
