@@ -109,11 +109,14 @@ Detailed assessment results:
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Origin': window.location.origin
         },
         withCredentials: true,
+        timeout: 30000,
+        proxy: false,
         validateStatus: function (status) {
-          return true; // Don't reject any status codes
+          return status >= 200 && status < 500;
         }
       });
 

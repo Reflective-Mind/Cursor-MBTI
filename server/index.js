@@ -21,30 +21,34 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? [
-        'https://cursor-mbti.vercel.app',
-        'https://cursor-mbti-jy10uyzsh-reflective-minds-projects.vercel.app',
-        'https://cursor-mbti-4qxkqwvuk-reflective-minds-projects.vercel.app',
-        'https://cursor-mbti-cp9py8d44-reflective-minds-projects.vercel.app',
-        'https://cursor-mbti-meh28kc3w-reflective-minds-projects.vercel.app',
-        'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
-        'http://localhost:3000'
-      ]
-    : 'http://localhost:3000',
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://cursor-mbti.vercel.app',
+      'https://cursor-mbti-jy10uyzsh-reflective-minds-projects.vercel.app',
+      'https://cursor-mbti-4qxkqwvuk-reflective-minds-projects.vercel.app',
+      'https://cursor-mbti-cp9py8d44-reflective-minds-projects.vercel.app',
+      'https://cursor-mbti-meh28kc3w-reflective-minds-projects.vercel.app',
+      'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
+      'http://localhost:3000'
+    ];
+    callback(null, allowedOrigins.includes(origin) || !origin);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 };
 
 // Apply CORS before other middleware
 app.use(cors(corsOptions));
 
-// Socket.IO CORS
+// Add preflight handling
+app.options('*', cors(corsOptions));
+
+// Socket.IO configuration
 const io = socketIo(server, {
   cors: {
     origin: corsOptions.origin,
@@ -53,11 +57,22 @@ const io = socketIo(server, {
     allowedHeaders: corsOptions.allowedHeaders
   },
   path: '/socket.io',
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  allowUpgrades: true,
+  cookie: false
 });
 
-// Add preflight handling
-app.options('*', cors(corsOptions));
+// Add middleware to handle CORS preflight for WebSocket
+app.use('/socket.io', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  next();
+});
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },

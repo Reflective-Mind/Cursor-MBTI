@@ -131,11 +131,13 @@ const Community = () => {
       console.log('Initializing socket connection to:', SOCKET_URL);
       const newSocket = io(SOCKET_URL, {
         auth: { token },
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
         reconnection: true,
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5,
+        timeout: 20000,
+        autoConnect: true,
         withCredentials: true,
         extraHeaders: {
           'Authorization': `Bearer ${token}`
@@ -159,10 +161,18 @@ const Community = () => {
           description: error.description,
           context: {
             url: SOCKET_URL,
-            token: token ? 'Present' : 'Missing'
+            token: token ? 'Present' : 'Missing',
+            transport: newSocket.io.engine.transport.name
           }
         });
-        setError('Failed to connect to chat server');
+        setError('Failed to connect to chat server. Retrying...');
+        
+        // Try to reconnect with polling if websocket fails
+        if (newSocket.io.engine.transport.name === 'websocket') {
+          newSocket.io.engine.transport.on('error', () => {
+            newSocket.io.engine.transport.close();
+          });
+        }
       });
 
       return () => {
