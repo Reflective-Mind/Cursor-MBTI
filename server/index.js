@@ -31,25 +31,23 @@ const corsOptions = {
       'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
       'http://localhost:3000'
     ];
-    console.log('Test 3 - CORS origin check:', { origin, allowed: !origin || allowedOrigins.includes(origin) });
-    callback(null, !origin || allowedOrigins.includes(origin));
+    console.log('Test 4 - CORS origin check:', { origin, allowed: !origin || allowedOrigins.includes(origin) });
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
   maxAge: 86400
 };
 
-// Apply CORS before other middleware
-app.use(cors(corsOptions));
-
-// Add preflight handling for all routes
-app.options('*', cors(corsOptions));
-
-// Add middleware to explicitly set CORS headers for all routes
+// Apply CORS before any other middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && corsOptions.origin(origin, (err, allowed) => allowed)) {
@@ -58,9 +56,19 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
     res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
     res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
+    res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
+
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
   }
   next();
 });
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 // Socket.IO configuration
 const io = socketIo(server, {

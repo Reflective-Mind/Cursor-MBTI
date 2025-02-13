@@ -93,7 +93,7 @@ Detailed assessment results:
         } Provide helpful, personalized advice and insights about MBTI personality types. Keep responses concise and focused on MBTI-related topics.`
       };
 
-      console.log('Test 3 - Sending chat request:', {
+      console.log('Test 4 - Sending chat request:', {
         url: `${process.env.REACT_APP_API_URL}/api/chat/message`,
         messages: messages.length,
         token: localStorage.getItem('token') ? 'Present' : 'Missing',
@@ -119,27 +119,28 @@ Detailed assessment results:
         }
       });
 
-      console.log('Test 3 - Chat API response:', {
+      console.log('Test 4 - Chat API response:', {
         status: response.status,
         statusText: response.statusText,
         data: response.data ? {
           choices: response.data.choices?.length,
           message: response.data.choices?.[0]?.message ? 'Present' : 'Missing'
-        } : 'Missing'
+        } : 'Missing',
+        headers: response.headers
       });
 
       if (response.status !== 200 || !response.data) {
-        throw new Error('Test 3 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
+        throw new Error('Test 4 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
       }
 
       if (!response.data.choices?.[0]?.message) {
-        throw new Error('Test 3 - Invalid response format from API');
+        throw new Error('Test 4 - Invalid response format from API');
       }
 
       const assistantMessage = response.data.choices[0].message;
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Test 3 - Chat API Error:', {
+      console.error('Test 4 - Chat API Error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
@@ -152,12 +153,12 @@ Detailed assessment results:
           }
         }
       });
-      setError('Test 3 - Sorry, I encountered an error. Please try again.');
+      setError('Test 4 - Sorry, I encountered an error. Please try again.');
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Test 3 - I apologize, but I encountered an error. Please try again.',
+          content: 'Test 4 - I apologize, but I encountered an error. Please try again.',
         },
       ]);
     } finally {
