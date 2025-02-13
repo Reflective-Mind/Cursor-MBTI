@@ -71,6 +71,13 @@ router.post('/message', auth, async (req, res) => {
     if (!response.data.choices?.[0]?.message) {
       throw new Error('Test 2 - Invalid response format from API');
     }
+
+    // Set CORS headers for successful response
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
     
     res.status(200).json(response.data);
   } catch (error) {
@@ -89,6 +96,13 @@ router.post('/message', auth, async (req, res) => {
       },
       stack: error.stack
     });
+
+    // Set CORS headers for error response
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
     
     res.status(error.response?.status || 500).json({ 
       message: 'Test 2 - Error processing chat request',

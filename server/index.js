@@ -31,12 +31,16 @@ const corsOptions = {
       'https://cursor-mbti-2z73umjte-reflective-minds-projects.vercel.app',
       'http://localhost:3000'
     ];
-    callback(null, allowedOrigins.includes(origin) || !origin);
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
   maxAge: 86400
@@ -45,8 +49,21 @@ const corsOptions = {
 // Apply CORS before other middleware
 app.use(cors(corsOptions));
 
-// Add preflight handling
+// Add preflight handling for all routes
 app.options('*', cors(corsOptions));
+
+// Add middleware to explicitly set CORS headers for all routes
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && corsOptions.origin(origin, (err, allowed) => allowed)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
+    res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
+    res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
+  }
+  next();
+});
 
 // Socket.IO configuration
 const io = socketIo(server, {
@@ -57,26 +74,13 @@ const io = socketIo(server, {
     allowedHeaders: corsOptions.allowedHeaders
   },
   path: '/socket.io',
-  transports: ['polling', 'websocket'],
+  transports: ['websocket', 'polling'],
   pingTimeout: 60000,
   pingInterval: 25000,
   upgradeTimeout: 30000,
   allowUpgrades: true,
   cookie: false,
   connectTimeout: 45000
-});
-
-// Add middleware to handle CORS preflight for WebSocket
-app.use('/socket.io', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.header('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
 });
 
 app.use(helmet({
