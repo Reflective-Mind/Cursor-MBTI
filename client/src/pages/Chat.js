@@ -114,7 +114,6 @@ Detailed assessment results:
         },
         withCredentials: true,
         timeout: 30000,
-        proxy: false,
         validateStatus: function (status) {
           return status >= 200 && status < 500;
         }

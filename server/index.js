@@ -52,17 +52,18 @@ app.options('*', cors(corsOptions));
 const io = socketIo(server, {
   cors: {
     origin: corsOptions.origin,
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
     allowedHeaders: corsOptions.allowedHeaders
   },
   path: '/socket.io',
-  transports: ['websocket', 'polling'],
+  transports: ['polling', 'websocket'],
   pingTimeout: 60000,
   pingInterval: 25000,
   upgradeTimeout: 30000,
   allowUpgrades: true,
-  cookie: false
+  cookie: false,
+  connectTimeout: 45000
 });
 
 // Add middleware to handle CORS preflight for WebSocket
@@ -70,8 +71,12 @@ app.use('/socket.io', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  next();
+  res.header('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
 });
 
 app.use(helmet({
@@ -123,25 +128,26 @@ mongoose.connect(process.env.MONGODB_URI)
   })
   .catch((err) => console.error('MongoDB connection error:', err));
 
-// Socket.IO Authentication Middleware
+// Socket.IO Authentication Middleware with better error handling
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token;
+    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
     if (!token) {
-      throw new Error('Authentication error');
+      return next(new Error('Authentication token is required'));
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
     
     if (!user) {
-      throw new Error('User not found');
+      return next(new Error('User not found'));
     }
 
     socket.user = user;
     next();
   } catch (error) {
-    next(new Error('Authentication error'));
+    console.error('Socket authentication error:', error);
+    next(new Error(error.message || 'Authentication failed'));
   }
 });
 

@@ -140,19 +140,9 @@ const Community = () => {
         autoConnect: true,
         withCredentials: true,
         extraHeaders: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
         }
-      });
-
-      newSocket.on('connect', () => {
-        console.log('Connected to chat server');
-        setSocket(newSocket);
-        setError(null);
-      });
-
-      newSocket.on('user:info', (userInfo) => {
-        console.log('Received user info:', userInfo);
-        newSocket.user = userInfo;
       });
 
       newSocket.on('connect_error', (error) => {
@@ -169,10 +159,40 @@ const Community = () => {
         
         // Try to reconnect with polling if websocket fails
         if (newSocket.io.engine.transport.name === 'websocket') {
+          console.log('Websocket failed, falling back to polling');
           newSocket.io.engine.transport.on('error', () => {
             newSocket.io.engine.transport.close();
           });
         }
+      });
+
+      // Add connection status logging
+      newSocket.on('connect', () => {
+        console.log('Connected to chat server successfully');
+        setError(null);
+      });
+
+      newSocket.on('disconnect', (reason) => {
+        console.log('Disconnected from chat server:', reason);
+        if (reason === 'io server disconnect') {
+          // Server initiated disconnect, try reconnecting
+          newSocket.connect();
+        }
+      });
+
+      newSocket.on('reconnect', (attemptNumber) => {
+        console.log('Reconnected to chat server after', attemptNumber, 'attempts');
+        setError(null);
+      });
+
+      newSocket.on('reconnect_error', (error) => {
+        console.error('Socket reconnection error:', error);
+        setError('Unable to reconnect to chat server. Please refresh the page.');
+      });
+
+      newSocket.on('user:info', (userInfo) => {
+        console.log('Received user info:', userInfo);
+        newSocket.user = userInfo;
       });
 
       return () => {
