@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: cursor-mbti-backend
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    nodeVersion: 18.x
+    envVars:
+      - key: NODE_ENV
+        value: production 
