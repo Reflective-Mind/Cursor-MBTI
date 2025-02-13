@@ -5,12 +5,17 @@ const axios = require('axios');
 // Send message to chat
 router.post('/message', async (req, res) => {
   try {
-    console.log('Sending request to LeChat API:', {
+    console.log('Received chat request:', {
       endpoint: process.env.LECHAT_API_ENDPOINT,
-      messages: req.body.messages
+      messages: req.body.messages,
+      apiKey: process.env.LECHAT_API_KEY ? 'Present' : 'Missing'
     });
 
-    const response = await axios.post(process.env.LECHAT_API_ENDPOINT, {
+    if (!process.env.LECHAT_API_KEY || !process.env.LECHAT_API_ENDPOINT) {
+      throw new Error('Missing LeChat API configuration');
+    }
+
+    const response = await axios.post('https://api.lechat.ai/v1/chat/completions', {
       model: "gpt-3.5-turbo",
       messages: req.body.messages,
       temperature: 0.7,
@@ -25,14 +30,20 @@ router.post('/message', async (req, res) => {
     console.log('LeChat API response:', response.data);
     res.status(200).json(response.data);
   } catch (error) {
-    console.error('Chat API Error:', {
-      error: error.response?.data || error.message,
+    console.error('Chat API Error Details:', {
+      message: error.message,
+      response: error.response?.data,
       status: error.response?.status,
-      headers: error.response?.headers
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers
+      }
     });
+    
     res.status(500).json({ 
       message: 'Error processing chat request',
-      error: error.response?.data || error.message 
+      details: error.response?.data?.error || error.message
     });
   }
 });
