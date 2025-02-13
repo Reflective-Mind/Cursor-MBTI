@@ -73,6 +73,33 @@ const Community = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Define handleChannelSelect first
+  const handleChannelSelect = React.useCallback((channel) => {
+    console.log('Selecting channel:', channel);
+    setCurrentChannel(channel);
+    setError(null);
+    setMessage(''); // Reset message input when changing channels
+    
+    // Load cached messages if they exist
+    if (channelMessages[channel._id]) {
+      setMessages(channelMessages[channel._id]);
+      setIsLoading(false);
+    } else {
+      setMessages([]);
+      setIsLoading(true);
+    }
+    
+    if (socket) {
+      // Leave current channel if any
+      if (currentChannel) {
+        socket.emit('channel:leave', currentChannel._id);
+      }
+      
+      // Join new channel
+      socket.emit('channel:join', channel._id);
+    }
+  }, [socket, currentChannel, channelMessages]);
+
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -278,33 +305,6 @@ const Community = () => {
       fetchChannels();
     }
   }, [socket, handleChannelSelect]);
-
-  // Move handleChannelSelect before the useEffect and wrap it in useCallback
-  const handleChannelSelect = React.useCallback((channel) => {
-    console.log('Selecting channel:', channel);
-    setCurrentChannel(channel);
-    setError(null);
-    setMessage(''); // Reset message input when changing channels
-    
-    // Load cached messages if they exist
-    if (channelMessages[channel._id]) {
-      setMessages(channelMessages[channel._id]);
-      setIsLoading(false);
-    } else {
-      setMessages([]);
-      setIsLoading(true);
-    }
-    
-    if (socket) {
-      // Leave current channel if any
-      if (currentChannel) {
-        socket.emit('channel:leave', currentChannel._id);
-      }
-      
-      // Join new channel
-      socket.emit('channel:join', channel._id);
-    }
-  }, [socket, currentChannel, channelMessages]);
 
   const handleSendMessage = (e) => {
     e?.preventDefault();

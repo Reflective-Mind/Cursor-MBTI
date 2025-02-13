@@ -1,6 +1,6 @@
 {
   "short_name": "MBTI Insights",
-  "name": "MBTI Insights - Personality Type Analysis",
+  "name": "MBTI Personality Insights",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,13 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#2196f3",
-  "background_color": "#ffffff"
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "permissions": [],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
