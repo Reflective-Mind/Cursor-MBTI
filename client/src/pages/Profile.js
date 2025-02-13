@@ -1,289 +1,167 @@
 import React, { useState, useEffect } from 'react';
 import {
   Container,
-  Typography,
-  Box,
   Paper,
+  Typography,
   Avatar,
-  Button,
-  TextField,
-  Grid,
+  Box,
   Chip,
   CircularProgress,
   Alert,
-  IconButton,
+  Grid,
+  Card,
+  CardContent,
 } from '@mui/material';
-import {
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  PhotoCamera as PhotoCameraIcon,
-} from '@mui/icons-material';
-import axios from 'axios';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const Profile = () => {
-  const { userId } = useParams();
-  const [user, setUser] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
-  const [editedData, setEditedData] = useState({
-    username: '',
-    bio: '',
-    mbtiType: '',
-  });
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { userId } = useParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchUserProfile();
-  }, [userId]);
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
 
-  const fetchUserProfile = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      let response;
-      
-      if (userId) {
-        // Fetch other user's profile
-        response = await axios.get(`/api/users/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setIsOwnProfile(false);
-      } else {
-        // Fetch own profile
-        response = await axios.get('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setIsOwnProfile(true);
-      }
-      
-      setUser(response.data.user);
-      setEditedData({
-        username: response.data.user.username,
-        bio: response.data.user.bio || '',
-        mbtiType: response.data.user.mbtiType || '',
-      });
-      setLoading(false);
-    } catch (err) {
-      setError(userId ? 'Failed to load user profile' : 'Failed to load profile');
-      setLoading(false);
-    }
-  };
-
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-      if (!validTypes.includes(file.type)) {
-        setError('Please select a valid image file (jpg, jpeg, png, gif)');
-        return;
-      }
-      
-      // Validate file size (5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size should be less than 5MB');
-        return;
-      }
-
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
-      setError(null);
-    }
-  };
-
-  const handleEditToggle = () => {
-    if (isEditing) {
-      setEditedData({
-        username: user.username,
-        bio: user.bio || '',
-        mbtiType: user.mbtiType || '',
-      });
-      setPreviewUrl(null);
-      setSelectedFile(null);
-    }
-    setIsEditing(!isEditing);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setEditedData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      // If there's a file to upload
-      if (selectedFile) {
-        const formData = new FormData();
-        formData.append('avatar', selectedFile);
-        await axios.post('/api/auth/avatar', formData, {
+        const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+        const response = await fetch(`${baseUrl}/api/users/${userId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
         });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/login');
+            return;
+          }
+          throw new Error('Failed to load user profile');
+        }
+
+        const data = await response.json();
+        setProfile(data);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        setError(error.message);
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      // Update other profile data
-      const response = await axios.patch('/api/auth/me', editedData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+    fetchProfile();
+  }, [userId, navigate]);
 
-      setUser(response.data.user);
-      setIsEditing(false);
-      setLoading(false);
-      setError(null);
-    } catch (err) {
-      setError('Failed to update profile');
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <CircularProgress />
-        </Box>
+      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
       </Container>
     );
   }
 
-  if (!user) {
+  if (error) {
     return (
-      <Container maxWidth="md">
-        <Box sx={{ mt: 4 }}>
-          <Alert severity="error">
-            {error || 'Please log in to view your profile'}
-          </Alert>
-        </Box>
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Alert severity="info">User not found</Alert>
       </Container>
     );
   }
 
   return (
-    <Container maxWidth="md">
-      <Box sx={{ my: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Grid container spacing={4}>
-            {/* Avatar Section */}
-            <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
-              <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                <Avatar
-                  src={previewUrl || user?.avatar}
-                  sx={{ width: 200, height: 200, mb: 2 }}
-                />
-                {isOwnProfile && isEditing && (
-                  <IconButton
-                    color="primary"
-                    aria-label="upload picture"
-                    component="label"
-                    sx={{
-                      position: 'absolute',
-                      bottom: 20,
-                      right: 0,
-                      backgroundColor: 'background.paper'
-                    }}
-                  >
-                    <input
-                      hidden
-                      accept="image/*"
-                      type="file"
-                      onChange={handleFileSelect}
-                    />
-                    <PhotoCameraIcon />
-                  </IconButton>
-                )}
-              </Box>
-            </Grid>
-
-            {/* Profile Info Section */}
-            <Grid item xs={12} md={8}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h4" gutterBottom>
-                  {user?.username}
-                </Typography>
-                {isOwnProfile && (
-                  <Button
-                    startIcon={isEditing ? <CancelIcon /> : <EditIcon />}
-                    onClick={handleEditToggle}
-                    color={isEditing ? 'error' : 'primary'}
-                  >
-                    {isEditing ? 'Cancel' : 'Edit Profile'}
-                  </Button>
-                )}
-              </Box>
-
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
-
-              <Box sx={{ mb: 3 }}>
-                {isOwnProfile && isEditing ? (
-                  <TextField
-                    fullWidth
-                    label="Username"
-                    name="username"
-                    value={editedData.username}
-                    onChange={handleInputChange}
-                    sx={{ mb: 2 }}
-                  />
-                ) : (
-                  <Chip
-                    label={`MBTI Type: ${user?.mbtiType || 'Not set'}`}
-                    color="primary"
-                    sx={{ mb: 2 }}
-                  />
-                )}
-
-                {isOwnProfile && isEditing ? (
-                  <TextField
-                    fullWidth
-                    label="Bio"
-                    name="bio"
-                    value={editedData.bio}
-                    onChange={handleInputChange}
-                    multiline
-                    rows={4}
-                  />
-                ) : (
-                  <Typography variant="body1">
-                    {user?.bio || 'No bio yet'}
-                  </Typography>
-                )}
-              </Box>
-
-              {isOwnProfile && isEditing && (
-                <Button
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  onClick={handleSubmit}
-                  disabled={loading}
-                >
-                  Save Changes
-                </Button>
-              )}
-            </Grid>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Paper elevation={3} sx={{ p: 4 }}>
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
+            <Avatar
+              src={profile.avatar}
+              sx={{
+                width: 150,
+                height: 150,
+                margin: '0 auto',
+                mb: 2,
+                border: 3,
+                borderColor: profile.isOnline ? 'success.main' : 'grey.300'
+              }}
+            >
+              {profile.username?.[0]}
+            </Avatar>
+            <Chip
+              label={profile.isOnline ? 'Online' : 'Offline'}
+              color={profile.isOnline ? 'success' : 'default'}
+              sx={{ mb: 2 }}
+            />
           </Grid>
-        </Paper>
-      </Box>
+          <Grid item xs={12} md={8}>
+            <Typography variant="h4" gutterBottom>
+              {profile.username}
+            </Typography>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              MBTI Type: {profile.mbtiType}
+            </Typography>
+            {profile.bio && (
+              <Typography variant="body1" paragraph>
+                {profile.bio}
+              </Typography>
+            )}
+          </Grid>
+        </Grid>
+
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Personality Traits
+          </Typography>
+          <Grid container spacing={2}>
+            {profile.mbtiType?.split('').map((trait, index) => (
+              <Grid item xs={6} sm={3} key={index}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h5" align="center">
+                      {trait}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" align="center">
+                      {getTraitDescription(trait)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      </Paper>
     </Container>
   );
+};
+
+const getTraitDescription = (trait) => {
+  const traits = {
+    'I': 'Introversion',
+    'E': 'Extroversion',
+    'N': 'Intuition',
+    'S': 'Sensing',
+    'T': 'Thinking',
+    'F': 'Feeling',
+    'J': 'Judging',
+    'P': 'Perceiving'
+  };
+  return traits[trait] || trait;
 };
 
 export default Profile; 
