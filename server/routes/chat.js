@@ -6,12 +6,13 @@ const axios = require('axios');
 // Send message to chat
 router.post('/message', auth, async (req, res) => {
   try {
-    console.log('Test 2 - Full request details:', {
+    console.log('Test 3 - Full request details:', {
       headers: {
         auth: req.headers.authorization ? 'Present' : 'Missing',
         contentType: req.headers['content-type'],
         accept: req.headers.accept,
-        origin: req.headers.origin
+        origin: req.headers.origin,
+        host: req.headers.host
       },
       body: {
         messageCount: req.body.messages?.length,
@@ -26,15 +27,15 @@ router.post('/message', auth, async (req, res) => {
     });
 
     if (!process.env.LECHAT_API_KEY) {
-      throw new Error('Test 2 - LeChat API key is missing');
+      throw new Error('Test 3 - LeChat API key is missing');
     }
 
     if (!req.body.messages || !Array.isArray(req.body.messages)) {
-      throw new Error('Test 2 - Invalid messages format');
+      throw new Error('Test 3 - Invalid messages format');
     }
 
     const apiUrl = 'https://api.lechat.ai/v1/chat/completions';
-    console.log('Test 2 - Making request to LeChat API');
+    console.log('Test 3 - Making request to LeChat API');
 
     const response = await axios.post(apiUrl, {
       model: "gpt-3.5-turbo",
@@ -55,7 +56,7 @@ router.post('/message', auth, async (req, res) => {
       }
     });
 
-    console.log('Test 2 - LeChat API response:', {
+    console.log('Test 3 - LeChat API response:', {
       status: response.status,
       statusText: response.statusText,
       hasData: Boolean(response.data),
@@ -65,23 +66,16 @@ router.post('/message', auth, async (req, res) => {
     });
 
     if (response.status !== 200 || !response.data) {
-      throw new Error('Test 2 - ' + (response.data?.error?.message || response.data?.error || 'LeChat API error'));
+      throw new Error('Test 3 - ' + (response.data?.error?.message || response.data?.error || 'LeChat API error'));
     }
 
     if (!response.data.choices?.[0]?.message) {
-      throw new Error('Test 2 - Invalid response format from API');
-    }
-
-    // Set CORS headers for successful response
-    const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      throw new Error('Test 3 - Invalid response format from API');
     }
     
     res.status(200).json(response.data);
   } catch (error) {
-    console.error('Test 2 - Chat API Error Details:', {
+    console.error('Test 3 - Chat API Error Details:', {
       message: error.message,
       response: {
         status: error.response?.status,
@@ -91,21 +85,16 @@ router.post('/message', auth, async (req, res) => {
       request: {
         url: error.config?.url,
         method: error.config?.method,
-        headers: error.config?.headers,
-        data: error.config?.data
+        headers: {
+          ...error.config?.headers,
+          Authorization: error.config?.headers?.Authorization ? 'Present' : 'Missing'
+        }
       },
       stack: error.stack
     });
-
-    // Set CORS headers for error response
-    const origin = req.headers.origin;
-    if (origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-    }
     
     res.status(error.response?.status || 500).json({ 
-      message: 'Test 2 - Error processing chat request',
+      message: 'Test 3 - Error processing chat request',
       details: error.response?.data?.error?.message || error.message,
       errorType: error.name,
       path: error.config?.url || 'unknown'

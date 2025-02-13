@@ -93,7 +93,7 @@ Detailed assessment results:
         } Provide helpful, personalized advice and insights about MBTI personality types. Keep responses concise and focused on MBTI-related topics.`
       };
 
-      console.log('Test 2 - Sending chat request:', {
+      console.log('Test 3 - Sending chat request:', {
         url: `${process.env.REACT_APP_API_URL}/api/chat/message`,
         messages: messages.length,
         token: localStorage.getItem('token') ? 'Present' : 'Missing',
@@ -110,8 +110,7 @@ Detailed assessment results:
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': window.location.origin
+          'Accept': 'application/json'
         },
         withCredentials: true,
         timeout: 30000,
@@ -120,7 +119,7 @@ Detailed assessment results:
         }
       });
 
-      console.log('Test 2 - Chat API response:', {
+      console.log('Test 3 - Chat API response:', {
         status: response.status,
         statusText: response.statusText,
         data: response.data ? {
@@ -130,32 +129,35 @@ Detailed assessment results:
       });
 
       if (response.status !== 200 || !response.data) {
-        throw new Error('Test 2 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
+        throw new Error('Test 3 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
       }
 
       if (!response.data.choices?.[0]?.message) {
-        throw new Error('Test 2 - Invalid response format from API');
+        throw new Error('Test 3 - Invalid response format from API');
       }
 
       const assistantMessage = response.data.choices[0].message;
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Test 2 - Chat API Error:', {
+      console.error('Test 3 - Chat API Error:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
         config: {
           url: error.config?.url,
           method: error.config?.method,
-          headers: error.config?.headers
+          headers: {
+            ...error.config?.headers,
+            Authorization: error.config?.headers?.Authorization ? 'Present' : 'Missing'
+          }
         }
       });
-      setError('Test 2 - Sorry, I encountered an error. Please try again.');
+      setError('Test 3 - Sorry, I encountered an error. Please try again.');
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Test 2 - I apologize, but I encountered an error. Please try again.',
+          content: 'Test 3 - I apologize, but I encountered an error. Please try again.',
         },
       ]);
     } finally {
