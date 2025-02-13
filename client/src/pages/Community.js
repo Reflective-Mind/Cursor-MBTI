@@ -73,6 +73,16 @@ const Community = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // Add authentication check
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('No authentication token found, redirecting to login');
+      navigate('/login');
+      return;
+    }
+  }, [navigate]);
+
   // Define handleChannelSelect first
   const handleChannelSelect = React.useCallback((channel) => {
     console.log('Selecting channel:', channel);
@@ -265,7 +275,8 @@ const Community = () => {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          credentials: 'include'
         });
         
         const data = await response.json();

@@ -110,7 +110,7 @@ const WorldMap = () => {
     return new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 },
-        texture: { 
+        worldTexture: { 
           value: new THREE.TextureLoader().load('/world-map-dots.png') 
         }
       },
@@ -125,12 +125,12 @@ const WorldMap = () => {
       `,
       fragmentShader: `
         uniform float time;
-        uniform sampler2D texture;
+        uniform sampler2D worldTexture;
         varying vec2 vUv;
         varying vec3 vPosition;
 
         void main() {
-          vec4 texColor = texture2D(texture, vUv);
+          vec4 texColor = texture2D(worldTexture, vUv);
           
           // Enhanced pulsing effect
           float pulse = sin(time * 0.5) * 0.5 + 0.5;
