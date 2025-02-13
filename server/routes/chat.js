@@ -45,18 +45,34 @@ router.post('/message', auth, async (req, res) => {
     const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
     const model = "mistral-large-latest";
 
+    // Add system message if not present
+    const messages = req.body.messages;
+    if (!messages.find(msg => msg.role === 'system')) {
+      messages.unshift({
+        role: 'system',
+        content: `You are a focused MBTI personality expert assistant. Your responses should be:
+1. Brief and to the point
+2. Directly related to the user's question
+3. MBTI-specific when relevant
+4. Limited to 2-3 sentences unless more detail is explicitly requested
+5. If the user asks about non-MBTI topics, provide a brief answer and gently guide them back to MBTI-related discussion
+6. For MBTI test questions, provide clear, concise guidance without giving away the answers
+7. Focus on helping users understand their own preferences rather than providing theoretical explanations`
+      });
+    }
+
     console.log('Test 5 - Making request to Mistral API:', {
       model,
-      messageCount: req.body.messages.length,
+      messageCount: messages.length,
       apiKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing'
     });
 
     const response = await client.chat.complete({
       model,
-      messages: req.body.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
+      messages,
+      temperature: 0.5, // Lower temperature for more focused responses
+      max_tokens: 150, // Limit response length
+      top_p: 0.9
     });
 
     console.log('Test 5 - Mistral API response:', {

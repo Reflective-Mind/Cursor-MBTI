@@ -274,12 +274,24 @@ const Community = () => {
           msg._id === updatedMessage._id ? updatedMessage : msg
         )
       );
+      // Update channel messages cache with reactions
+      setChannelMessages(prev => ({
+        ...prev,
+        [currentChannel._id]: prev[currentChannel._id].map(msg =>
+          msg._id === updatedMessage._id ? updatedMessage : msg
+        )
+      }));
     });
 
     socket.on('message:delete', (messageId) => {
       setMessages((prev) =>
         prev.filter((msg) => msg._id !== messageId)
       );
+      // Update channel messages cache for deleted messages
+      setChannelMessages(prev => ({
+        ...prev,
+        [currentChannel._id]: prev[currentChannel._id].filter(msg => msg._id !== messageId)
+      }));
     });
 
     socket.on('users:initial', (initialUsers) => {
@@ -496,7 +508,7 @@ const Community = () => {
     socket.emit('message:react', { messageId, emoji });
     
     // Update UI optimistically
-    setMessages(prev => prev.map(msg => {
+    const updateMessages = (messages) => messages.map(msg => {
       if (msg._id !== messageId) return msg;
       
       const existingReaction = msg.reactions?.find(r => r.emoji === emoji);
@@ -527,6 +539,13 @@ const Community = () => {
         ...msg,
         reactions: [...(msg.reactions || []), { emoji, users: [socket.user._id] }]
       };
+    });
+
+    // Update both messages state and channel messages cache
+    setMessages(prev => updateMessages(prev));
+    setChannelMessages(prev => ({
+      ...prev,
+      [currentChannel._id]: updateMessages(prev[currentChannel._id] || [])
     }));
     
     setShowEmojiPicker(false);
