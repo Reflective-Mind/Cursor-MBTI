@@ -128,7 +128,16 @@ const Community = () => {
     }
 
     try {
-      console.log('Initializing socket connection to:', SOCKET_URL);
+      console.log('Test 2 - Initializing socket connection:', {
+        url: SOCKET_URL,
+        token: token ? 'Present' : 'Missing',
+        env: {
+          NODE_ENV: process.env.NODE_ENV,
+          REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+          REACT_APP_SOCKET_URL: process.env.REACT_APP_SOCKET_URL
+        }
+      });
+
       const newSocket = io(SOCKET_URL, {
         auth: { token },
         transports: ['polling', 'websocket'],
@@ -140,69 +149,89 @@ const Community = () => {
         autoConnect: true,
         withCredentials: true,
         extraHeaders: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Origin': window.location.origin
         }
       });
 
       setSocket(newSocket);
 
       newSocket.on('connect_error', (error) => {
-        console.error('Socket connection error:', {
+        console.error('Test 2 - Socket connection error:', {
           message: error.message,
           description: error.description,
           context: {
             url: SOCKET_URL,
             token: token ? 'Present' : 'Missing',
             transport: newSocket.io.engine.transport.name,
-            readyState: newSocket.io.engine.readyState
+            readyState: newSocket.io.engine.readyState,
+            connected: newSocket.connected,
+            disconnected: newSocket.disconnected
           }
         });
-        setError('Failed to connect to chat server. Retrying...');
-        
-        // Try to reconnect with polling if websocket fails
-        if (newSocket.io.engine.transport.name === 'websocket') {
-          console.log('Websocket failed, falling back to polling');
-          newSocket.io.engine.transport.close();
-        }
+        setError('Test 2 - Failed to connect to chat server. Retrying...');
       });
 
       newSocket.on('connect', () => {
-        console.log('Connected to chat server successfully');
+        console.log('Test 2 - Connected to chat server successfully:', {
+          transport: newSocket.io.engine.transport.name,
+          id: newSocket.id
+        });
         setError(null);
       });
 
       newSocket.on('disconnect', (reason) => {
-        console.log('Disconnected from chat server:', reason);
+        console.log('Test 2 - Disconnected from chat server:', {
+          reason,
+          wasConnected: newSocket.connected,
+          transport: newSocket.io.engine.transport?.name
+        });
+        
         if (reason === 'io server disconnect') {
           // Server initiated disconnect, try reconnecting
+          console.log('Test 2 - Server initiated disconnect, attempting reconnect');
           newSocket.connect();
         }
       });
 
       newSocket.on('reconnect', (attemptNumber) => {
-        console.log('Reconnected to chat server after', attemptNumber, 'attempts');
+        console.log('Test 2 - Reconnected to chat server:', {
+          attemptNumber,
+          transport: newSocket.io.engine.transport.name
+        });
         setError(null);
       });
 
       newSocket.on('reconnect_error', (error) => {
-        console.error('Socket reconnection error:', error);
-        setError('Unable to reconnect to chat server. Please refresh the page.');
+        console.error('Test 2 - Socket reconnection error:', {
+          message: error.message,
+          type: error.type,
+          description: error.description
+        });
+        setError('Test 2 - Unable to reconnect to chat server. Please refresh the page.');
       });
 
       newSocket.on('user:info', (userInfo) => {
-        console.log('Received user info:', userInfo);
+        console.log('Test 2 - Received user info:', userInfo);
         newSocket.user = userInfo;
       });
 
       return () => {
         if (newSocket) {
-          console.log('Cleaning up socket connection');
+          console.log('Test 2 - Cleaning up socket connection');
           newSocket.close();
         }
       };
     } catch (error) {
-      console.error('Socket initialization error:', error);
-      setError('Failed to initialize chat connection');
+      console.error('Test 2 - Socket initialization error:', {
+        message: error.message,
+        stack: error.stack,
+        context: {
+          url: SOCKET_URL,
+          token: token ? 'Present' : 'Missing'
+        }
+      });
+      setError('Test 2 - Failed to initialize chat connection');
     }
   }, [navigate]);
 
