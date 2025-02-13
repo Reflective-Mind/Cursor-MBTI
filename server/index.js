@@ -123,7 +123,7 @@ const io = socketIo(server, {
     origin: corsOptions.origin,
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: corsOptions.allowedHeaders
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
   },
   path: '/socket.io',
   transports: ['websocket', 'polling'],

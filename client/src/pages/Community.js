@@ -130,7 +130,11 @@ const Community = () => {
       auth: { token },
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      withCredentials: true,
+      extraHeaders: {
+        'Authorization': `Bearer ${token}`
+      }
     };
 
     const socket = io(socketUrl, socketOptions);
@@ -306,10 +310,9 @@ const Community = () => {
 
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/community/channels`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          },
-          credentials: 'include'
+          }
         });
         
         const data = await response.json();
@@ -327,7 +330,7 @@ const Community = () => {
         setChannels(data.channels);
         
         // Auto-join first channel if we have channels and socket
-        if (data.channels.length > 0 && socket) {
+        if (data.channels.length > 0 && socket && !currentChannel) {
           handleChannelSelect(data.channels[0]);
         }
       } catch (error) {
@@ -345,10 +348,10 @@ const Community = () => {
       }
     };
 
-    if (socket) {
+    if (socket && !channels.length) {
       fetchChannels();
     }
-  }, [socket, handleChannelSelect]);
+  }, [socket, handleChannelSelect, currentChannel, channels.length]);
 
   const handleSendMessage = (e) => {
     e?.preventDefault();
