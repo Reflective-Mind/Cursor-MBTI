@@ -102,15 +102,14 @@ Detailed assessment results:
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/chat/message`, {
         messages: [
           systemMessage,
-          ...messages,
+          ...messages.filter(msg => msg.role !== 'error'),
           userMessage
         ]
       }, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': window.location.origin
+          'Accept': 'application/json'
         },
         withCredentials: true,
         timeout: 30000,
@@ -122,18 +121,22 @@ Detailed assessment results:
       console.log('Chat API response:', {
         status: response.status,
         statusText: response.statusText,
-        data: response.data ? 'Present' : 'Missing'
+        data: response.data ? {
+          choices: response.data.choices?.length,
+          message: response.data.choices?.[0]?.message ? 'Present' : 'Missing'
+        } : 'Missing'
       });
 
-      if (response.status !== 200) {
-        throw new Error(response.data?.message || response.data?.details || 'Chat API error');
+      if (response.status !== 200 || !response.data) {
+        throw new Error(response.data?.error?.message || response.data?.message || 'Chat API error');
       }
 
-      if (response.data.choices && response.data.choices[0]?.message) {
-        setMessages((prev) => [...prev, response.data.choices[0].message]);
-      } else {
+      if (!response.data.choices?.[0]?.message) {
         throw new Error('Invalid response format from API');
       }
+
+      const assistantMessage = response.data.choices[0].message;
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Chat API Error:', {
         message: error.message,

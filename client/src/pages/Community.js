@@ -140,10 +140,11 @@ const Community = () => {
         autoConnect: true,
         withCredentials: true,
         extraHeaders: {
-          'Authorization': `Bearer ${token}`,
-          'Origin': window.location.origin
+          'Authorization': `Bearer ${token}`
         }
       });
+
+      setSocket(newSocket);
 
       newSocket.on('connect_error', (error) => {
         console.error('Socket connection error:', {
@@ -152,7 +153,8 @@ const Community = () => {
           context: {
             url: SOCKET_URL,
             token: token ? 'Present' : 'Missing',
-            transport: newSocket.io.engine.transport.name
+            transport: newSocket.io.engine.transport.name,
+            readyState: newSocket.io.engine.readyState
           }
         });
         setError('Failed to connect to chat server. Retrying...');
@@ -160,13 +162,10 @@ const Community = () => {
         // Try to reconnect with polling if websocket fails
         if (newSocket.io.engine.transport.name === 'websocket') {
           console.log('Websocket failed, falling back to polling');
-          newSocket.io.engine.transport.on('error', () => {
-            newSocket.io.engine.transport.close();
-          });
+          newSocket.io.engine.transport.close();
         }
       });
 
-      // Add connection status logging
       newSocket.on('connect', () => {
         console.log('Connected to chat server successfully');
         setError(null);
@@ -197,6 +196,7 @@ const Community = () => {
 
       return () => {
         if (newSocket) {
+          console.log('Cleaning up socket connection');
           newSocket.close();
         }
       };
