@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { Mistral } = require('@mistralai/mistralai');
+const { MistralClient } = require('@mistralai/mistralai');
 
 // Send message to chat
 router.post('/message', auth, async (req, res) => {
@@ -42,8 +42,8 @@ router.post('/message', auth, async (req, res) => {
       throw new Error('Test 5 - Invalid messages format');
     }
 
-    const client = new Mistral(process.env.MISTRAL_API_KEY);
-    const model = "mistral-large-latest";
+    const client = new MistralClient(process.env.MISTRAL_API_KEY);
+    const model = "mistral-medium";
 
     console.log('Test 5 - Making request to Mistral API:', {
       model,
@@ -51,16 +51,16 @@ router.post('/message', auth, async (req, res) => {
       apiKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing'
     });
 
-    const response = await client.chat({
+    const response = await client.chatCompletions.create({
       model,
       messages: req.body.messages.map(msg => ({
         role: msg.role,
         content: msg.content
       })),
       temperature: 0.7,
-      max_tokens: 1000,
-      top_p: 1,
-      safe_prompt: true
+      maxTokens: 1000,
+      topP: 1,
+      safeMode: true
     });
 
     console.log('Test 5 - Mistral API response:', {

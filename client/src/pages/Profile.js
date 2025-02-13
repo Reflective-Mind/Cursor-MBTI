@@ -30,13 +30,41 @@ const Profile = () => {
           return;
         }
 
+        console.log('Test 4 - Fetching profile:', {
+          userId,
+          token: token ? 'Present' : 'Missing',
+          env: {
+            NODE_ENV: process.env.NODE_ENV,
+            REACT_APP_API_URL: process.env.REACT_APP_API_URL
+          }
+        });
+
         const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-        const response = await fetch(`${baseUrl}/api/users/${userId}`, {
+        const apiUrl = `${baseUrl}/api/users/${userId}`;
+
+        console.log('Test 4 - Making request to:', {
+          url: apiUrl,
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer [REDACTED]',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const response = await fetch(apiUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
           credentials: 'include'
+        });
+
+        console.log('Test 4 - Profile API response:', {
+          status: response.status,
+          ok: response.ok,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
         });
 
         if (!response.ok) {
@@ -45,20 +73,39 @@ const Profile = () => {
             navigate('/login');
             return;
           }
-          throw new Error('Failed to load user profile');
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to load user profile');
         }
 
         const data = await response.json();
+        console.log('Test 4 - Profile data:', {
+          username: data.username,
+          mbtiType: data.mbtiType,
+          isOnline: data.isOnline
+        });
+
         setProfile(data);
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        console.error('Test 4 - Error fetching profile:', {
+          message: error.message,
+          userId,
+          env: {
+            NODE_ENV: process.env.NODE_ENV,
+            REACT_APP_API_URL: process.env.REACT_APP_API_URL
+          }
+        });
         setError(error.message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchProfile();
+    if (userId) {
+      fetchProfile();
+    } else {
+      setError('No user ID provided');
+      setIsLoading(false);
+    }
   }, [userId, navigate]);
 
   if (isLoading) {
