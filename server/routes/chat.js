@@ -5,8 +5,7 @@ const axios = require('axios');
 // Send message to chat
 router.post('/message', async (req, res) => {
   try {
-    const response = await axios.post('https://api.mistral.ai/v1/chat/completions', {
-      model: 'mistral-tiny',
+    const response = await axios.post(process.env.LECHAT_API_ENDPOINT, {
       messages: req.body.messages,
       temperature: 0.7,
       max_tokens: 1000,
