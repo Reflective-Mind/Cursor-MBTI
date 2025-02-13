@@ -11,9 +11,11 @@ import {
   Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [tab, setTab] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
@@ -114,7 +116,7 @@ const Login = () => {
         throw new Error('Test 8 - No token received from server');
       }
 
-      localStorage.setItem('token', data.token);
+      login(data.user, data.token);
       localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
       navigate('/community');
     } catch (error) {

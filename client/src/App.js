@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Components
 import Navbar from './components/Navbar';
@@ -12,6 +13,7 @@ import Chat from './pages/Chat';
 import Community from './pages/Community';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
+import Test from './pages/Test';
 
 // Create theme
 const theme = createTheme({
@@ -126,24 +128,27 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <div className="App" style={{
-          minHeight: '100vh',
-          background: 'linear-gradient(180deg, #020818 0%, #000000 100%)',
-        }}>
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/assessment" element={<Assessment />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/:userId" element={<Profile />} />
-          </Routes>
-        </div>
-      </Router>
+      <AuthProvider>
+        <Router>
+          <div className="App" style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(180deg, #020818 0%, #000000 100%)',
+          }}>
+            <Navbar />
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/assessment" element={<Assessment />} />
+              <Route path="/insights" element={<Insights />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/community" element={<Community />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/:userId" element={<Profile />} />
+              <Route path="/test" element={<Test />} />
+            </Routes>
+          </div>
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
