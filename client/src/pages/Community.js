@@ -50,7 +50,10 @@ const Community = () => {
   const [channels, setChannels] = useState([]);
   const [currentChannel, setCurrentChannel] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [channelMessages, setChannelMessages] = useState({});
+  const [channelMessages, setChannelMessages] = useState(() => {
+    const savedMessages = localStorage.getItem('channelMessages');
+    return savedMessages ? JSON.parse(savedMessages) : {};
+  });
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -72,6 +75,13 @@ const Community = () => {
       return;
     }
   }, [navigate]);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (Object.keys(channelMessages).length > 0) {
+      localStorage.setItem('channelMessages', JSON.stringify(channelMessages));
+    }
+  }, [channelMessages]);
 
   // Define handleChannelSelect first
   const handleChannelSelect = React.useCallback((channel) => {
@@ -244,10 +254,14 @@ const Community = () => {
           const filtered = prev.filter(msg => !msg.temporary);
           const updated = [...filtered, newMessage];
           // Update channel messages cache
-          setChannelMessages(prevChannelMessages => ({
-            ...prevChannelMessages,
-            [currentChannel._id]: updated
-          }));
+          setChannelMessages(prevChannelMessages => {
+            const updatedCache = {
+              ...prevChannelMessages,
+              [currentChannel._id]: updated
+            };
+            localStorage.setItem('channelMessages', JSON.stringify(updatedCache));
+            return updatedCache;
+          });
           return updated;
         });
         scrollToBottom();
