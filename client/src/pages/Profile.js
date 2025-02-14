@@ -49,53 +49,76 @@ const Profile = () => {
         setLoading(true);
         setError(null);
         
-        // If no userId is provided, use the current user's ID
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login', { 
+            state: { from: `/profile/${userId || ''}` },
+            replace: true 
+          });
+          return;
+        }
+
+        // Determine which profile to fetch
         const targetUserId = userId || currentUser?._id;
         
         if (!targetUserId) {
-          throw new Error('Please log in to view profiles');
+          setError('No user ID available. Please log in or provide a user ID.');
+          return;
         }
 
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('Authentication required');
-        }
+        console.log('Test 6 - Fetching profile:', {
+          targetUserId,
+          currentUser: currentUser?._id,
+          token: token ? 'Present' : 'Missing'
+        });
 
-        console.log('Fetching profile for:', targetUserId);
-
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetUserId}`, {
+        const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+        const response = await fetch(`${baseUrl}/api/users/${targetUserId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
-          }
+          },
+          credentials: 'include'
+        });
+
+        console.log('Test 6 - Profile API response:', {
+          status: response.status,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries())
         });
 
         if (!response.ok) {
           if (response.status === 401) {
             localStorage.removeItem('token');
-            throw new Error('Session expired. Please log in again.');
+            navigate('/login', { 
+              state: { from: `/profile/${userId || ''}` },
+              replace: true 
+            });
+            return;
           }
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to load profile');
         }
 
         const data = await response.json();
+        console.log('Test 6 - Profile data:', {
+          username: data.username,
+          mbtiType: data.mbtiType,
+          isCurrentUser: data._id === currentUser?._id
+        });
+
         setUser(data);
-        // Initialize edit form with current data
         setEditForm({
           username: data.username || '',
           mbtiType: data.mbtiType || '',
           bio: data.bio || ''
         });
       } catch (err) {
-        console.error('Profile loading error:', err);
+        console.error('Test 6 - Profile loading error:', {
+          message: err.message,
+          stack: err.stack
+        });
         setError(err.message);
-        if (err.message.includes('log in') || err.message.includes('Authentication required')) {
-          navigate('/login', { 
-            state: { from: `/profile/${userId || ''}` },
-            replace: true 
-          });
-        }
       } finally {
         setLoading(false);
       }
@@ -107,15 +130,31 @@ const Profile = () => {
   const handleEditSubmit = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('Authentication required');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${user._id}`, {
+      console.log('Test 6 - Updating profile:', {
+        userId: user._id,
+        updates: { ...editForm, password: '[REDACTED]' }
+      });
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+      const response = await fetch(`${baseUrl}/api/users/${user._id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(editForm)
+      });
+
+      console.log('Test 6 - Update profile response:', {
+        status: response.status,
+        ok: response.ok
       });
 
       if (!response.ok) {
@@ -126,11 +165,16 @@ const Profile = () => {
       const updatedUser = await response.json();
       setUser(updatedUser);
       setIsEditing(false);
+
       // Update local storage if it's the current user
       if (user._id === currentUser?._id) {
         localStorage.setItem('mbtiType', updatedUser.mbtiType);
       }
     } catch (err) {
+      console.error('Test 6 - Profile update error:', {
+        message: err.message,
+        stack: err.stack
+      });
       setError(err.message);
     }
   };
