@@ -470,84 +470,131 @@ const Profile = () => {
         {/* Sections */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {profile?.profileSections?.map((section) => (
-            <Paper
+            <Accordion
               key={section.id}
-              elevation={2}
-              sx={{ 
-                p: 2,
-                borderRadius: 2,
-                border: '1px solid',
-                borderColor: 'divider'
+              expanded={expandedSection === section.id}
+              onChange={() => handleSectionExpand(section.id)}
+              sx={{
+                backgroundColor: 'background.paper',
+                '&:before': {
+                  display: 'none',
+                },
+                boxShadow: 2,
               }}
             >
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 2
-              }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  {section.title}
-                </Typography>
-                {isOwnProfile && (
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      startIcon={<AddIcon />}
-                      onClick={() => handleAddContent(section.id)}
-                      size="small"
-                      variant="outlined"
-                    >
-                      Add Text
-                    </Button>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleDeleteSection(section.id, e)}
-                      color="error"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                )}
-              </Box>
-              
-              {/* Section Content */}
-              <Box sx={{ pl: 2 }}>
-                {section.content?.map((item) => (
-                  <Box
-                    key={item.id}
-                    sx={{
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                sx={{
+                  borderBottom: expandedSection === section.id ? 1 : 0,
+                  borderColor: 'divider',
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+              >
+                <Box sx={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  pr: 2
+                }}>
+                  <Typography variant="h6" sx={{ fontWeight: 'medium' }}>
+                    {section.title}
+                  </Typography>
+                  {isOwnProfile && (
+                    <Box sx={{ 
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      py: 1,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      '&:last-child': {
-                        borderBottom: 'none'
-                      }
-                    }}
-                  >
-                    <Typography variant="body1">
-                      {item.content}
-                    </Typography>
-                    {isOwnProfile && (
+                      gap: 1,
+                      visibility: expandedSection === section.id ? 'visible' : 'hidden'
+                    }}>
+                      <Button
+                        startIcon={<AddIcon />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddContent(section.id);
+                        }}
+                        size="small"
+                        variant="outlined"
+                      >
+                        Add Text
+                      </Button>
                       <IconButton
                         size="small"
-                        onClick={(e) => handleDeleteContent(section.id, item.id, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSection(section.id, e);
+                        }}
                         color="error"
                       >
                         <DeleteIcon />
                       </IconButton>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-            </Paper>
+                    </Box>
+                  )}
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 2 }}>
+                {/* Section Content */}
+                <Box sx={{ pl: 2 }}>
+                  {section.content?.map((item) => (
+                    <Box
+                      key={item.id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        py: 1.5,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        '&:last-child': {
+                          borderBottom: 'none'
+                        }
+                      }}
+                    >
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          flex: 1,
+                          color: 'text.primary',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'
+                        }}
+                      >
+                        {item.content}
+                      </Typography>
+                      {isOwnProfile && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleDeleteContent(section.id, item.id, e)}
+                          color="error"
+                          sx={{ ml: 1 }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
+                    </Box>
+                  ))}
+                  {section.content?.length === 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                      No content yet. {isOwnProfile ? 'Click "Add Text" to add some content.' : ''}
+                    </Typography>
+                  )}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
           ))}
         </Box>
 
         {/* Add Section Dialog */}
-        <Dialog open={newSectionDialog} onClose={() => setNewSectionDialog(false)}>
+        <Dialog 
+          open={newSectionDialog} 
+          onClose={() => {
+            setNewSectionDialog(false);
+            setError(null);
+          }}
+          fullWidth
+          maxWidth="sm"
+        >
           <DialogTitle>Add New Section</DialogTitle>
           <DialogContent>
             <TextField
@@ -559,6 +606,7 @@ const Profile = () => {
               onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
               error={!!error && error.includes('title')}
               helperText={error && error.includes('title') ? error : ''}
+              sx={{ mt: 2 }}
             />
           </DialogContent>
           <DialogActions>
@@ -575,7 +623,15 @@ const Profile = () => {
         </Dialog>
 
         {/* Add Content Dialog */}
-        <Dialog open={contentDialog} onClose={() => setContentDialog(false)}>
+        <Dialog 
+          open={contentDialog} 
+          onClose={() => {
+            setContentDialog(false);
+            setError(null);
+          }}
+          fullWidth
+          maxWidth="sm"
+        >
           <DialogTitle>Add Text</DialogTitle>
           <DialogContent>
             <TextField
@@ -588,6 +644,7 @@ const Profile = () => {
               onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
               error={!!error && error.includes('content')}
               helperText={error && error.includes('content') ? error : ''}
+              sx={{ mt: 2 }}
             />
           </DialogContent>
           <DialogActions>
