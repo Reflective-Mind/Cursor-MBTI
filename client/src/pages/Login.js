@@ -26,7 +26,7 @@ const Login = () => {
   });
   const [error, setError] = useState(null);
 
-  // Get the return URL from the location state or default to '/community'
+  // Get the return URL from location state or default to '/community'
   const from = location.state?.from?.pathname || '/community';
 
   const handleTabChange = (event, newValue) => {
@@ -54,14 +54,7 @@ const Login = () => {
           ...formData,
           password: '[REDACTED]'
         },
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          REACT_APP_API_URL: process.env.REACT_APP_API_URL
-        }
+        returnUrl: from
       });
       
       const response = await fetch(apiUrl, {
@@ -75,78 +68,39 @@ const Login = () => {
         body: JSON.stringify(formData)
       });
 
-      console.log('Test 8 - Auth API response status:', {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          REACT_APP_API_URL: process.env.REACT_APP_API_URL
-        }
-      });
-
-      if (response.status === 404) {
-        throw new Error('Test 8 - Authentication service is not available. Please try again later.');
-      }
-
-      if (response.status === 403) {
-        throw new Error('Test 8 - Access denied. Please check your connection and try again.');
-      }
-
-      const contentType = response.headers.get('content-type');
-      let data;
-      
-      try {
-        data = await response.json();
-      } catch (error) {
-        console.error('Test 8 - Error parsing response:', error);
-        throw new Error('Test 8 - Invalid response from server. Please try again.');
-      }
-
-      console.log('Test 8 - Auth API response data:', {
-        status: response.status,
-        ok: response.ok,
-        contentType,
-        data: data.token ? { ...data, token: '[REDACTED]' } : data,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
       if (!response.ok) {
-        throw new Error(data.message || data.details || `Test 8 - Authentication failed with status ${response.status}`);
+        const data = await response.json();
+        throw new Error(data.message || `Authentication failed with status ${response.status}`);
       }
 
+      const data = await response.json();
+      
       if (!data.token) {
-        throw new Error('Test 8 - No token received from server');
+        throw new Error('No token received from server');
       }
 
+      // Login and store user data
       login(data.user, data.token);
       localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
       
-      // Navigate to the original destination
+      console.log('Test 8 - Login successful, navigating to:', from);
+      
+      // Navigate to the return URL
       navigate(from, { replace: true });
     } catch (error) {
       console.error('Test 8 - Auth error:', {
         message: error.message,
-        formData: {
-          ...formData,
-          password: '[REDACTED]'
-        },
-        endpoint: tab === 0 ? 'login' : 'register',
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          REACT_APP_API_URL: process.env.REACT_APP_API_URL
-        }
+        returnUrl: from
       });
 
       let errorMessage = error.message;
       if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-        errorMessage = 'Test 8 - Unable to connect to the server. Please check your connection and try again.';
+        errorMessage = 'Unable to connect to the server. Please check your connection and try again.';
       } else if (error.message.includes('CORS')) {
-        errorMessage = 'Test 8 - Connection error. Please try again later.';
+        errorMessage = 'Connection error. Please try again later.';
       }
 
-      setError(errorMessage || 'Test 8 - Authentication failed. Please try again.');
+      setError(errorMessage || 'Authentication failed. Please try again.');
     }
   };
 

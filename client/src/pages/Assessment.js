@@ -1518,8 +1518,17 @@ const Assessment = () => {
     }
   };
 
+  const handleOpenChat = (question) => {
+    setCurrentQuestion(question);
+    setAiMessages([{
+      role: 'assistant',
+      content: `I'm here to help you understand the question: "${question.text}"\n\nOption A: ${question.options[0].text}\nOption B: ${question.options[1].text}\n\nWhat would you like to know about this question?`
+    }]);
+    setIsChatOpen(true);
+  };
+
   const handleAskAI = async () => {
-    if (!aiInput.trim()) return;
+    if (!aiInput.trim() || !currentQuestion) return;
     
     try {
       const token = localStorage.getItem('token');
@@ -1534,20 +1543,27 @@ const Assessment = () => {
         messages: [
           {
             role: 'system',
-            content: `You are a concise MBTI assessment helper. Current question category: ${currentQuestion.category}
+            content: `You are a focused MBTI assessment helper specifically helping with this question:
 
-Question: "${currentQuestion.question}"
+Category: ${currentQuestion.category}
+Question: "${currentQuestion.text}"
 Option A: ${currentQuestion.options[0].text}
 Option B: ${currentQuestion.options[1].text}
 
-When asked about MBTI concepts:
-1. First give a clear, 1-2 sentence definition of the concept
-2. Then provide a brief, real-world example in 1 sentence
-3. Finally, ask one reflective question to help the user relate to the concept
+Your role is to:
+1. Help the user understand this specific question and its options
+2. Explain the MBTI concepts relevant to this particular question
+3. Provide real-world examples that relate directly to this question
+4. Help the user reflect on their own preferences related to this specific scenario
 
-Keep total response under 4 sentences. Be direct and clear. Don't use complex terminology.
+Keep responses focused on this question only. Don't discuss other MBTI topics unless directly related to understanding this question.
 
-If the user asks "What does [concept] mean?", respond with just steps 1-2 above (definition and example).`
+If the user seems unsure:
+1. Break down the question into simpler terms
+2. Explain what each option really means in everyday life
+3. Help them reflect on their own experiences related to this specific scenario
+
+Keep responses concise (2-4 sentences) and use simple language.`
           },
           ...aiMessages,
           { role: 'user', content: aiInput }
@@ -1603,15 +1619,12 @@ If the user asks "What does [concept] mean?", respond with just steps 1-2 above 
       </FormControl>
       <Button
         startIcon={<HelpIcon />}
-        onClick={() => {
-          setCurrentQuestion(question);
-          setIsChatOpen(true);
-        }}
+        onClick={() => handleOpenChat(question)}
         variant="text"
         color="secondary"
         sx={{ mt: 1 }}
       >
-        Unsure? Ask AI for help
+        Unsure about this question? Ask AI for help
       </Button>
     </Box>
   );
