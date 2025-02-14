@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const [tab, setTab] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
@@ -25,6 +25,7 @@ const Login = () => {
     mbtiType: ''
   });
   const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get the return URL from location state or default to '/community'
   const from = location.state?.from?.pathname || '/community';
@@ -41,66 +42,24 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setIsSubmitting(true);
 
     try {
-      const endpoint = tab === 0 ? '/api/auth/login' : '/api/auth/register';
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const apiUrl = `${baseUrl}${endpoint}`;
-      
-      console.log('Test 8 - Sending auth request:', {
-        url: apiUrl,
-        method: 'POST',
-        formData: {
-          ...formData,
-          password: '[REDACTED]'
-        },
-        returnUrl: from
-      });
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include',
-        mode: 'cors',
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || `Authentication failed with status ${response.status}`);
+      if (tab === 0) {
+        // Login
+        await login(formData.email, formData.password);
+      } else {
+        // Register
+        await register(formData.username, formData.email, formData.password, formData.mbtiType);
       }
-
-      const data = await response.json();
       
-      if (!data.token) {
-        throw new Error('No token received from server');
-      }
-
-      // Login and store user data
-      login(data.user, data.token);
-      localStorage.setItem('mbtiType', formData.mbtiType || data.user?.mbtiType);
-      
-      console.log('Test 8 - Login successful, navigating to:', from);
-      
-      // Navigate to the return URL
+      console.log('Authentication successful, navigating to:', from);
       navigate(from, { replace: true });
     } catch (error) {
-      console.error('Test 8 - Auth error:', {
-        message: error.message,
-        returnUrl: from
-      });
-
-      let errorMessage = error.message;
-      if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-        errorMessage = 'Unable to connect to the server. Please check your connection and try again.';
-      } else if (error.message.includes('CORS')) {
-        errorMessage = 'Connection error. Please try again later.';
-      }
-
-      setError(errorMessage || 'Authentication failed. Please try again.');
+      console.error('Authentication error:', error);
+      setError(error.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -139,6 +98,7 @@ const Login = () => {
                   value={formData.username}
                   onChange={handleChange}
                   required
+                  disabled={isSubmitting}
                 />
               )}
               
@@ -149,6 +109,7 @@ const Login = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                disabled={isSubmitting}
               />
               
               <TextField
@@ -158,6 +119,7 @@ const Login = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                disabled={isSubmitting}
               />
 
               {tab === 1 && (
@@ -168,6 +130,7 @@ const Login = () => {
                   value={formData.mbtiType}
                   onChange={handleChange}
                   required
+                  disabled={isSubmitting}
                   SelectProps={{
                     native: true,
                   }}
@@ -185,9 +148,10 @@ const Login = () => {
                 type="submit"
                 variant="contained"
                 size="large"
+                disabled={isSubmitting}
                 sx={{ mt: 2 }}
               >
-                {tab === 0 ? 'Login' : 'Register'}
+                {isSubmitting ? 'Please wait...' : (tab === 0 ? 'Login' : 'Register')}
               </Button>
             </Box>
           </form>

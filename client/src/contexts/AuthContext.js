@@ -71,22 +71,29 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to login');
+        throw new Error(data.message || 'Failed to login');
       }
 
-      const data = await response.json();
+      if (!data.token) {
+        throw new Error('No token received from server');
+      }
+
       localStorage.setItem('token', data.token);
-      localStorage.setItem('mbtiType', data.user.mbtiType);
+      if (data.user?.mbtiType) {
+        localStorage.setItem('mbtiType', data.user.mbtiType);
+      }
       setUser(data.user);
+      return data.user;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     }
   };
 
-  const register = async (username, email, password) => {
+  const register = async (username, email, password, mbtiType) => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
         method: 'POST',
@@ -96,18 +103,30 @@ export const AuthProvider = ({ children }) => {
         },
         credentials: 'include',
         mode: 'cors',
-        body: JSON.stringify({ username, email, password })
+        body: JSON.stringify({
+          username,
+          email,
+          password,
+          mbtiType
+        })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to register');
+        throw new Error(data.message || 'Failed to register');
       }
 
-      const data = await response.json();
+      if (!data.token) {
+        throw new Error('No token received from server');
+      }
+
       localStorage.setItem('token', data.token);
-      localStorage.setItem('mbtiType', data.user.mbtiType);
+      if (data.user?.mbtiType) {
+        localStorage.setItem('mbtiType', data.user.mbtiType);
+      }
       setUser(data.user);
+      return data.user;
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
