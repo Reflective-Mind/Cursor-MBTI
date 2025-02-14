@@ -87,13 +87,16 @@ const Login = () => {
     try {
       if (tab === 0) {
         // Login
+        console.log('Attempting login...');
         await login(formData.email, formData.password);
+        console.log('Login successful, navigating to:', from);
       } else {
         // Register
+        console.log('Attempting registration...');
         await register(formData.username, formData.email, formData.password, formData.mbtiType);
+        console.log('Registration successful');
       }
       
-      console.log('Authentication successful, navigating to:', from);
       navigate(from, { replace: true });
     } catch (error) {
       console.error('Authentication error:', error);
@@ -111,6 +114,10 @@ const Login = () => {
   ];
 
   const isLoading = isSubmitting || authLoading;
+
+  const buttonText = isLoading 
+    ? (tab === 0 ? 'Logging in...' : 'Registering...') 
+    : (tab === 0 ? 'Login' : 'Register');
 
   return (
     <Container maxWidth="sm">
@@ -196,10 +203,10 @@ const Login = () => {
                 {isLoading ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <CircularProgress size={20} color="inherit" />
-                    <span>Please wait...</span>
+                    <span>{buttonText}</span>
                   </Box>
                 ) : (
-                  tab === 0 ? 'Login' : 'Register'
+                  buttonText
                 )}
               </Button>
             </Box>

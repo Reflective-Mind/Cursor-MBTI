@@ -113,29 +113,36 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({ email, password })
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to login');
+        const errorMessage = data.message || 'Failed to login';
+        console.error('Login failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       if (!data.token) {
-        throw new Error('No token received from server');
+        console.error('No token received from server');
+        throw new Error('Authentication failed - no token received');
       }
 
+      // Store token and user data
       localStorage.setItem('token', data.token);
       if (data.user?.mbtiType) {
         localStorage.setItem('mbtiType', data.user.mbtiType);
       }
+      
+      // Set user state
       setUser(data.user);
+      
+      console.log('Login successful');
       return data.user;
     } catch (error) {
       console.error('Login error:', error);
-      setError(error.message);
+      setError(error.message || 'An unexpected error occurred during login');
       throw error;
     } finally {
       setLoading(false);
