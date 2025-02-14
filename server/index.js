@@ -443,6 +443,7 @@ app.get('/', (req, res) => {
 // API routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/test-results', require('./routes/testResults'));
 app.use('/api/personality', require('./routes/personality'));
 app.use('/api/insights', require('./routes/insights'));
 app.use('/api/chat', require('./routes/chat'));

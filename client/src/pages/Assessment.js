@@ -1557,7 +1557,7 @@ const Assessment = () => {
         console.log('Submitting test results with payload:', payload);
 
         // Store test results
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me/test-results`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/test-results`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

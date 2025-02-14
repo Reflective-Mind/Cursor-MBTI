@@ -10,8 +10,13 @@ const openai = new OpenAI({
 });
 
 // Store test results
-router.post('/users/me/test-results', auth, async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
+    console.log('Received test results request:', {
+      userId: req.user._id,
+      testType: req.body.testType
+    });
+
     // Map test type to category
     const testTypeMapping = {
       'mbti-8': 'mbti-8',
@@ -21,7 +26,18 @@ router.post('/users/me/test-results', auth, async (req, res) => {
 
     const testCategory = testTypeMapping[req.body.testType];
     if (!testCategory) {
+      console.error('Invalid test type:', req.body.testType);
       return res.status(400).json({ message: 'Invalid test type' });
+    }
+
+    // Validate required fields
+    if (!req.body.result || !req.body.answers || !req.body.questions) {
+      console.error('Missing required fields:', {
+        hasResult: !!req.body.result,
+        hasAnswers: !!req.body.answers,
+        hasQuestions: !!req.body.questions
+      });
+      return res.status(400).json({ message: 'Missing required fields' });
     }
 
     // Check if a result for this test category already exists
@@ -30,7 +46,9 @@ router.post('/users/me/test-results', auth, async (req, res) => {
       testCategory
     });
 
+    let savedResult;
     if (existingResult) {
+      console.log('Updating existing test result');
       // Update existing result
       existingResult.result = req.body.result;
       existingResult.answers = req.body.answers.map(answer => ({
@@ -39,19 +57,9 @@ router.post('/users/me/test-results', auth, async (req, res) => {
         category: req.body.questions.find(q => q.id === answer.questionId)?.category
       }));
       existingResult.analysisVersion += 1;
-      await existingResult.save();
-      
-      // Update user's MBTI type if this is the most comprehensive test
-      if (testCategory === 'mbti-100' || 
-         (testCategory === 'mbti-24' && !await TestResult.findOne({ user: req.user._id, testCategory: 'mbti-100' })) ||
-         (testCategory === 'mbti-8' && !await TestResult.findOne({ user: req.user._id, testCategory: { $in: ['mbti-24', 'mbti-100'] } }))) {
-        await User.findByIdAndUpdate(req.user._id, {
-          mbtiType: req.body.result.type
-        });
-      }
-      
-      return res.status(200).json(existingResult);
+      savedResult = await existingResult.save();
     } else {
+      console.log('Creating new test result');
       // Create new result
       const testResult = new TestResult({
         user: req.user._id,
@@ -63,23 +71,27 @@ router.post('/users/me/test-results', auth, async (req, res) => {
           category: req.body.questions.find(q => q.id === answer.questionId)?.category
         }))
       });
-
-      await testResult.save();
-
-      // Update user's MBTI type following the same logic
-      if (testCategory === 'mbti-100' || 
-         (testCategory === 'mbti-24' && !await TestResult.findOne({ user: req.user._id, testCategory: 'mbti-100' })) ||
-         (testCategory === 'mbti-8' && !await TestResult.findOne({ user: req.user._id, testCategory: { $in: ['mbti-24', 'mbti-100'] } }))) {
-        await User.findByIdAndUpdate(req.user._id, {
-          mbtiType: req.body.result.type
-        });
-      }
-
-      return res.status(201).json(testResult);
+      savedResult = await testResult.save();
     }
+
+    // Update user's MBTI type if this is the most comprehensive test
+    if (testCategory === 'mbti-100' || 
+       (testCategory === 'mbti-24' && !await TestResult.findOne({ user: req.user._id, testCategory: 'mbti-100' })) ||
+       (testCategory === 'mbti-8' && !await TestResult.findOne({ user: req.user._id, testCategory: { $in: ['mbti-24', 'mbti-100'] } }))) {
+      await User.findByIdAndUpdate(req.user._id, {
+        mbtiType: req.body.result.type
+      });
+      console.log('Updated user MBTI type:', req.body.result.type);
+    }
+
+    console.log('Successfully saved test result');
+    return res.status(existingResult ? 200 : 201).json(savedResult);
   } catch (error) {
     console.error('Error storing test results:', error);
-    res.status(500).json({ message: 'Error storing test results' });
+    res.status(500).json({ 
+      message: 'Error storing test results',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
