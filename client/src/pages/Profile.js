@@ -169,9 +169,8 @@ const Profile = () => {
         return;
       }
 
-      // Use currentUser._id when accessing own profile
-      const userId = isOwnProfile ? currentUser._id : profile._id;
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/sections`, {
+      // Use profile._id for API calls
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -295,9 +294,8 @@ const Profile = () => {
         return;
       }
 
-      // Use currentUser._id when accessing own profile
-      const userId = isOwnProfile ? currentUser._id : profile._id;
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/sections/${selectedSection}/content`, {
+      // Use profile._id for API calls
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
