@@ -6,7 +6,7 @@ const User = require('../models/User');
 // Get current user's profile
 router.get('/me', auth, async (req, res) => {
   try {
-    console.log('Test 7 - Fetching current user profile:', {
+    console.log('Test 8 - Fetching current user profile:', {
       userId: req.user.userId
     });
 
@@ -15,24 +15,35 @@ router.get('/me', auth, async (req, res) => {
       .lean();
 
     if (!user) {
+      console.log('Test 8 - Current user not found:', {
+        userId: req.user.userId
+      });
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Add online status
+    // Add online status and last active time
     user.isOnline = user.status === 'online';
+    user.lastActive = user.lastActive || new Date();
 
-    console.log('Test 7 - Current user profile found:', {
+    console.log('Test 8 - Current user profile found:', {
       username: user.username,
       mbtiType: user.mbtiType,
-      isOnline: user.isOnline
+      isOnline: user.isOnline,
+      lastActive: user.lastActive
     });
 
     res.json(user);
   } catch (error) {
-    console.error('Test 7 - Get current user error:', {
+    console.error('Test 8 - Get current user error:', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      userId: req.user.userId
     });
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+    
     res.status(500).json({ message: 'Error getting user profile' });
   }
 });

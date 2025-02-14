@@ -58,18 +58,45 @@ const Profile = () => {
           return;
         }
 
-        // Determine which profile to fetch
+        // If no userId is provided in URL and we have currentUser, use currentUser's ID
         const targetUserId = userId || currentUser?._id;
         
+        // If we still don't have a targetUserId, try to fetch current user's profile
         if (!targetUserId) {
-          setError('No user ID available. Please log in or provide a user ID.');
+          console.log('Test 8 - No target user ID, fetching current user profile');
+          const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
+          const response = await fetch(`${baseUrl}/api/users/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json'
+            },
+            credentials: 'include'
+          });
+
+          if (!response.ok) {
+            if (response.status === 401) {
+              localStorage.removeItem('token');
+              navigate('/login');
+              return;
+            }
+            throw new Error('Failed to fetch current user profile');
+          }
+
+          const data = await response.json();
+          setUser(data);
+          setEditForm({
+            username: data.username || '',
+            mbtiType: data.mbtiType || '',
+            bio: data.bio || ''
+          });
+          setLoading(false);
           return;
         }
 
-        console.log('Test 6 - Fetching profile:', {
+        console.log('Test 8 - Fetching profile:', {
           targetUserId,
           currentUser: currentUser?._id,
-          token: token ? 'Present' : 'Missing'
+          isOwnProfile: targetUserId === currentUser?._id
         });
 
         const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
@@ -81,10 +108,9 @@ const Profile = () => {
           credentials: 'include'
         });
 
-        console.log('Test 6 - Profile API response:', {
+        console.log('Test 8 - Profile API response:', {
           status: response.status,
-          ok: response.ok,
-          headers: Object.fromEntries(response.headers.entries())
+          ok: response.ok
         });
 
         if (!response.ok) {
@@ -101,7 +127,7 @@ const Profile = () => {
         }
 
         const data = await response.json();
-        console.log('Test 6 - Profile data:', {
+        console.log('Test 8 - Profile data:', {
           username: data.username,
           mbtiType: data.mbtiType,
           isCurrentUser: data._id === currentUser?._id
@@ -114,7 +140,7 @@ const Profile = () => {
           bio: data.bio || ''
         });
       } catch (err) {
-        console.error('Test 6 - Profile loading error:', {
+        console.error('Test 8 - Profile loading error:', {
           message: err.message,
           stack: err.stack
         });
