@@ -43,18 +43,14 @@ const corsOptions = {
     const allowedOrigins = [
       'https://cursor-mbti.vercel.app',
       'http://localhost:3000',
-      'https://mbti-render.onrender.com'
+      'https://mbti-render.onrender.com',
+      undefined // Allow requests with no origin (like mobile apps or curl requests)
     ];
-
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('Origin not allowed:', origin);
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
@@ -76,8 +72,7 @@ app.options('*', cors(corsOptions));
 // Add middleware to set CORS headers for all responses
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  
-  if (origin) {
+  if (origin && corsOptions.origin(origin, (error, allowed) => allowed)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));

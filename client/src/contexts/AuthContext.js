@@ -24,26 +24,32 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
-          }
+          },
+          credentials: 'include',
+          mode: 'cors'
         });
 
         if (!response.ok) {
           if (response.status === 401) {
             localStorage.removeItem('token');
+            localStorage.removeItem('mbtiType');
+            setUser(null);
+            return;
           }
-          throw new Error('Authentication failed');
+          throw new Error('Failed to check authentication');
         }
 
         const data = await response.json();
-        setUser(data.user);
+        setUser(data);
       } catch (error) {
         console.error('Auth check error:', error);
-        setUser(null);
         localStorage.removeItem('token');
+        localStorage.removeItem('mbtiType');
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -52,16 +58,84 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = (userData, token) => {
-    localStorage.setItem('token', token);
-    setUser(userData);
+  const login = async (email, password) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        mode: 'cors',
+        body: JSON.stringify({ email, password })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to login');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('mbtiType', data.user.mbtiType);
+      setUser(data.user);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('mbtiType');
-    localStorage.removeItem('mbtiDetails');
-    setUser(null);
+  const register = async (username, email, password) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        mode: 'cors',
+        body: JSON.stringify({ username, email, password })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to register');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('mbtiType', data.user.mbtiType);
+      setUser(data.user);
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        mode: 'cors'
+      });
+
+      if (!response.ok) {
+        console.error('Logout failed:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('mbtiType');
+      setUser(null);
+    }
   };
 
   const value = {
@@ -69,6 +143,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
+    register,
     isAuthenticated: !!user
   };
 
