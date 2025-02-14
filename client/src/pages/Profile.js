@@ -110,72 +110,73 @@ const Profile = () => {
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
   useEffect(() => {
-    // Don't redirect while still checking authentication
-    if (authLoading) {
-      return;
-    }
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // If no userId provided and we have currentUser, use current user's ID
+        const targetId = userId || currentUser?._id;
+        
+        if (!targetId) {
+          setError('No user ID available');
+          setLoading(false);
+          return;
+        }
 
-    // If no user and finished loading auth, redirect to login
-    if (!currentUser) {
-      navigate('/login', { state: { from: location.pathname } });
-      return;
-    }
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login', { state: { from: location.pathname } });
+          return;
+        }
 
-    // If no userId provided, use current user's ID
-    const targetId = userId || currentUser._id;
-    if (targetId) {
-      fetchProfile(targetId);
-    }
-  }, [userId, currentUser, authLoading, location.pathname]);
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
 
-  const fetchProfile = async (targetId) => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login', { state: { from: location.pathname } });
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+
+        const data = await response.json();
+        setProfile(data);
+        setEditForm({
+          username: data.username || '',
+          mbtiType: data.mbtiType || '',
+          bio: data.bio || '',
+          location: data.location || '',
+          occupation: data.occupation || '',
+          education: data.education || '',
+          languages: data.languages || [],
+          interests: data.interests || [],
+          achievements: data.achievements || []
+        });
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only fetch if we're done checking auth
+    if (!authLoading) {
+      if (!currentUser) {
         navigate('/login', { state: { from: location.pathname } });
-        return;
+      } else {
+        fetchProfile();
       }
-
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        credentials: 'include'
-      });
-
-      if (response.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('mbtiType');
-        navigate('/login', { state: { from: location.pathname } });
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch profile');
-      }
-
-      const data = await response.json();
-      setProfile(data);
-      setEditForm({
-        username: data.username || '',
-        mbtiType: data.mbtiType || '',
-        bio: data.bio || '',
-        location: data.location || '',
-        occupation: data.occupation || '',
-        education: data.education || '',
-        languages: data.languages || [],
-        interests: data.interests || [],
-        achievements: data.achievements || []
-      });
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      setError('Failed to load profile');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [userId, currentUser, authLoading, navigate, location.pathname]);
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -198,14 +199,19 @@ const Profile = () => {
 
   const handleSave = async () => {
     try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify(editForm)
       });
 
@@ -219,8 +225,9 @@ const Profile = () => {
       setIsEditing(false);
       setError(null);
     } catch (error) {
-      console.error('Error updating profile:', error);
-      setError(error.message || 'Failed to update profile');
+      setError(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -527,7 +534,7 @@ const Profile = () => {
   };
 
   // Show loading state while checking authentication
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
         <CircularProgress />
@@ -544,8 +551,17 @@ const Profile = () => {
     );
   }
 
-  // Don't render anything while redirecting
-  if (!currentUser) {
+  // Show loading state while fetching profile
+  if (loading) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  // Don't render anything if no profile data
+  if (!profile) {
     return null;
   }
 
