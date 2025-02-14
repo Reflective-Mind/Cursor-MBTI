@@ -72,7 +72,7 @@ const Profile = () => {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   
-  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -81,15 +81,12 @@ const Profile = () => {
     username: '',
     mbtiType: '',
     bio: '',
-    location: { city: '', country: '' },
+    location: '',
     occupation: '',
     education: '',
-    socialLinks: {
-      twitter: '',
-      linkedin: '',
-      github: '',
-      website: ''
-    }
+    languages: [],
+    interests: [],
+    achievements: []
   });
   const [sections, setSections] = useState([]);
   const [editingSection, setEditingSection] = useState(null);
@@ -98,7 +95,7 @@ const Profile = () => {
   const [newContentTitle, setNewContentTitle] = useState('');
   const [newContentValue, setNewContentValue] = useState('');
   const [sectionMenuAnchor, setSectionMenuAnchor] = useState(null);
-  const [contentMenuAnchor, setContentMenuAnchor] = useState(null);
+  const const contentMenuAnchor = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedContent, setSelectedContent] = useState(null);
 
@@ -109,88 +106,78 @@ const Profile = () => {
     'ISTP', 'ISFP', 'ESTP', 'ESFP'
   ];
 
+  const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
-        const targetUserId = userId || currentUser?._id;
-        const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-        const endpoint = targetUserId ? `/api/users/${targetUserId}` : '/api/users/me';
-        
-        const response = await fetch(`${baseUrl}${endpoint}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          },
-          credentials: 'include'
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem('token');
-            navigate('/login');
-            return;
-          }
-          throw new Error('Failed to load profile');
-        }
-
-        const data = await response.json();
-        setUser(data);
-        initializeEditForm(data);
-      } catch (err) {
-        console.error('Profile loading error:', err);
-        setError(err.message || 'Failed to load profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProfile();
-  }, [userId, currentUser, navigate]);
+  }, [userId]);
 
-  const initializeEditForm = (userData) => {
-    setEditForm({
-      username: userData.username || '',
-      mbtiType: userData.mbtiType || '',
-      bio: userData.bio || '',
-      location: userData.location || { city: '', country: '' },
-      occupation: userData.occupation || '',
-      education: userData.education || '',
-      socialLinks: userData.socialLinks || {
-        twitter: '',
-        linkedin: '',
-        github: '',
-        website: ''
-      }
-    });
-  };
-
-  const handleEditSubmit = async () => {
+  const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
+      const targetId = userId || currentUser?._id;
+      if (!targetId) {
         navigate('/login');
         return;
       }
 
-      const targetUserId = userId || currentUser?._id;
-      if (!targetUserId) {
-        throw new Error('No user ID available for update');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
       }
 
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${targetUserId}`, {
+      const data = await response.json();
+      setProfile(data);
+      setEditForm({
+        username: data.username || '',
+        mbtiType: data.mbtiType || '',
+        bio: data.bio || '',
+        location: data.location || '',
+        occupation: data.occupation || '',
+        education: data.education || '',
+        languages: data.languages || [],
+        interests: data.interests || [],
+        achievements: data.achievements || []
+      });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditForm({
+      username: profile.username || '',
+      mbtiType: profile.mbtiType || '',
+      bio: profile.bio || '',
+      location: profile.location || '',
+      occupation: profile.occupation || '',
+      education: profile.education || '',
+      languages: profile.languages || [],
+      interests: profile.interests || [],
+      achievements: profile.achievements || []
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -199,67 +186,66 @@ const Profile = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update profile');
+        throw new Error('Failed to update profile');
       }
 
-      const updatedUser = await response.json();
-      setUser(updatedUser);
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
       setIsEditing(false);
-
-      if (targetUserId === currentUser?._id) {
-        localStorage.setItem('mbtiType', updatedUser.mbtiType);
-      }
-    } catch (err) {
-      console.error('Profile update error:', err);
-      setError(err.message || 'Failed to update profile');
+      setError(null);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setError('Failed to update profile');
     }
   };
 
-  const handleTabChange = (event, newValue) => {
-    setActiveTab(newValue);
+  const handleChange = (e) => {
+    setEditForm({
+      ...editForm,
+      [e.target.name]: e.target.value
+    });
   };
 
   const handleAddLanguage = () => {
-    setEditForm(prev => ({
-      ...prev,
-      languages: [...prev.languages, { name: '', proficiency: 'beginner' }]
-    }));
+    setEditForm({
+      ...editForm,
+      languages: [...editForm.languages, { name: '', proficiency: 'beginner' }]
+    });
   };
 
   const handleRemoveLanguage = (index) => {
-    setEditForm(prev => ({
-      ...prev,
-      languages: prev.languages.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleAddAchievement = () => {
-    setEditForm(prev => ({
-      ...prev,
-      achievements: [...prev.achievements, { title: '', description: '', date: new Date() }]
-    }));
-  };
-
-  const handleRemoveAchievement = (index) => {
-    setEditForm(prev => ({
-      ...prev,
-      achievements: prev.achievements.filter((_, i) => i !== index)
-    }));
+    setEditForm({
+      ...editForm,
+      languages: editForm.languages.filter((_, i) => i !== index)
+    });
   };
 
   const handleAddInterest = () => {
-    setEditForm(prev => ({
-      ...prev,
-      interests: [...prev.interests, '']
-    }));
+    setEditForm({
+      ...editForm,
+      interests: [...editForm.interests, '']
+    });
   };
 
   const handleRemoveInterest = (index) => {
-    setEditForm(prev => ({
-      ...prev,
-      interests: prev.interests.filter((_, i) => i !== index)
-    }));
+    setEditForm({
+      ...editForm,
+      interests: editForm.interests.filter((_, i) => i !== index)
+    });
+  };
+
+  const handleAddAchievement = () => {
+    setEditForm({
+      ...editForm,
+      achievements: [...editForm.achievements, { title: '', description: '' }]
+    });
+  };
+
+  const handleRemoveAchievement = (index) => {
+    setEditForm({
+      ...editForm,
+      achievements: editForm.achievements.filter((_, i) => i !== index)
+    });
   };
 
   const handleAddSection = async () => {
@@ -271,7 +257,7 @@ const Profile = () => {
       }
 
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections`, {
+      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -299,7 +285,7 @@ const Profile = () => {
       }
 
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}`, {
+      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections/${sectionId}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -327,7 +313,7 @@ const Profile = () => {
       }
 
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}`, {
+      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections/${sectionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -351,7 +337,7 @@ const Profile = () => {
       }
 
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}/content`, {
+      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections/${sectionId}/content`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -388,7 +374,7 @@ const Profile = () => {
 
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(
-        `${baseUrl}/api/users/${user._id}/sections/${sectionId}/content/${contentId}`,
+        `${baseUrl}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`,
         {
           method: 'PATCH',
           headers: {
@@ -428,7 +414,7 @@ const Profile = () => {
 
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(
-        `${baseUrl}/api/users/${user._id}/sections/${sectionId}/content/${contentId}`,
+        `${baseUrl}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`,
         {
           method: 'DELETE',
           headers: {
@@ -516,7 +502,7 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
         <CircularProgress />
       </Container>
     );
@@ -524,726 +510,284 @@ const Profile = () => {
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Container maxWidth="md" sx={{ mt: 4 }}>
         <Alert severity="error">{error}</Alert>
       </Container>
     );
   }
 
-  if (!user) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Alert severity="info">Profile not found</Alert>
-      </Container>
-    );
-  }
-
-  const isOwnProfile = currentUser?._id === user._id;
-
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Paper elevation={3} sx={{ p: 3 }}>
+        {/* Header Section */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Avatar
-              src={user.avatar}
-              sx={{ width: 100, height: 100 }}
+              sx={{ width: 100, height: 100, fontSize: '2.5rem' }}
             >
-              {user.username?.[0]}
+              {profile?.username?.[0]?.toUpperCase()}
             </Avatar>
             <Box>
-              {!isEditing ? (
-                <>
-                  <Typography variant="h4">{user.username}</Typography>
-                  <Typography variant="h6" color="text.secondary">{user.mbtiType}</Typography>
-                </>
-              ) : null}
+              {isEditing ? (
+                <TextField
+                  name="username"
+                  value={editForm.username}
+                  onChange={handleChange}
+                  variant="standard"
+                  sx={{ mb: 1 }}
+                />
+              ) : (
+                <Typography variant="h4">{profile?.username}</Typography>
+              )}
+              {isEditing ? (
+                <TextField
+                  name="mbtiType"
+                  value={editForm.mbtiType}
+                  onChange={handleChange}
+                  variant="standard"
+                  size="small"
+                />
+              ) : (
+                <Chip label={profile?.mbtiType} color="primary" />
+              )}
             </Box>
           </Box>
           {isOwnProfile && (
-            <Button
-              variant="contained"
-              startIcon={isEditing ? <SaveIcon /> : <EditIcon />}
-              onClick={() => {
-                if (isEditing) {
-                  handleEditSubmit();
-                } else {
-                  setIsEditing(true);
-                }
-              }}
-            >
-              {isEditing ? 'Save Changes' : 'Edit Profile'}
-            </Button>
+            <Box>
+              {isEditing ? (
+                <>
+                  <IconButton onClick={handleSave} color="primary">
+                    <SaveIcon />
+                  </IconButton>
+                  <IconButton onClick={handleCancel} color="error">
+                    <CancelIcon />
+                  </IconButton>
+                </>
+              ) : (
+                <IconButton onClick={handleEdit} color="primary">
+                  <EditIcon />
+                </IconButton>
+              )}
+            </Box>
           )}
         </Box>
 
-        {isEditing && isOwnProfile ? (
-          <Box component="form" sx={{ mt: 3 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Username"
-                  value={editForm.username}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  select
-                  label="MBTI Type"
-                  value={editForm.mbtiType}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, mbtiType: e.target.value }))}
-                >
-                  {mbtiTypes.map((type) => (
-                    <MenuItem key={type} value={type}>
-                      {type}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label="Bio"
-                  value={editForm.bio}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="City"
-                  value={editForm.location.city}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    location: { ...prev.location, city: e.target.value }
-                  }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Country"
-                  value={editForm.location.country}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    location: { ...prev.location, country: e.target.value }
-                  }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Occupation"
-                  value={editForm.occupation}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, occupation: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Education"
-                  value={editForm.education}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, education: e.target.value }))}
-                />
-              </Grid>
-            </Grid>
+        <Divider sx={{ my: 3 }} />
 
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>Social Links</Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Twitter"
-                    value={editForm.socialLinks.twitter}
-                    onChange={(e) => setEditForm(prev => ({
-                      ...prev,
-                      socialLinks: { ...prev.socialLinks, twitter: e.target.value }
-                    }))}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="LinkedIn"
-                    value={editForm.socialLinks.linkedin}
-                    onChange={(e) => setEditForm(prev => ({
-                      ...prev,
-                      socialLinks: { ...prev.socialLinks, linkedin: e.target.value }
-                    }))}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="GitHub"
-                    value={editForm.socialLinks.github}
-                    onChange={(e) => setEditForm(prev => ({
-                      ...prev,
-                      socialLinks: { ...prev.socialLinks, github: e.target.value }
-                    }))}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Website"
-                    value={editForm.socialLinks.website}
-                    onChange={(e) => setEditForm(prev => ({
-                      ...prev,
-                      socialLinks: { ...prev.socialLinks, website: e.target.value }
-                    }))}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-
-            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setIsEditing(false);
-                  initializeEditForm(user);
-                }}
-              >
-                Cancel
-              </Button>
-            </Box>
-          </Box>
-        ) : (
-          <>
-            <Typography variant="body1" sx={{ mt: 2, mb: 3 }}>{user.bio}</Typography>
-            
-            <Grid container spacing={3}>
-              {user.location?.city && user.location?.country && (
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <LocationIcon color="action" />
-                    <Typography>{`${user.location.city}, ${user.location.country}`}</Typography>
-                  </Box>
-                </Grid>
-              )}
-              
-              {user.occupation && (
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <WorkIcon color="action" />
-                    <Typography>{user.occupation}</Typography>
-                  </Box>
-                </Grid>
-              )}
-              
-              {user.education && (
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <SchoolIcon color="action" />
-                    <Typography>{user.education}</Typography>
-                  </Box>
-                </Grid>
-              )}
-            </Grid>
-
-            {Object.values(user.socialLinks || {}).some(link => link) && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" gutterBottom>Social Links</Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  {user.socialLinks?.twitter && (
-                    <IconButton
-                      component={Link}
-                      href={user.socialLinks.twitter}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <TwitterIcon />
-                    </IconButton>
-                  )}
-                  {user.socialLinks?.linkedin && (
-                    <IconButton
-                      component={Link}
-                      href={user.socialLinks.linkedin}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <LinkedInIcon />
-                    </IconButton>
-                  )}
-                  {user.socialLinks?.github && (
-                    <IconButton
-                      component={Link}
-                      href={user.socialLinks.github}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <GitHubIcon />
-                    </IconButton>
-                  )}
-                  {user.socialLinks?.website && (
-                    <IconButton
-                      component={Link}
-                      href={user.socialLinks.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <WebsiteIcon />
-                    </IconButton>
-                  )}
-                </Box>
-              </Box>
-            )}
-          </>
-        )}
-      </Paper>
-
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          borderRadius: theme.shape.borderRadius,
-          overflow: 'hidden',
-          background: `linear-gradient(to bottom, ${user.theme?.primaryColor || theme.palette.primary.main}22, transparent)`
-        }}
-      >
-        {/* Tabs Section */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange}
-            variant={isMobile ? "scrollable" : "fullWidth"}
-            scrollButtons={isMobile ? "auto" : false}
-          >
-            <Tab label="Personality" />
-            <Tab label="Interests" />
-            <Tab label="Languages" />
-            <Tab label="Achievements" />
-          </Tabs>
+        {/* Bio Section */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>About Me</Typography>
+          {isEditing ? (
+            <TextField
+              name="bio"
+              value={editForm.bio}
+              onChange={handleChange}
+              multiline
+              rows={4}
+              fullWidth
+            />
+          ) : (
+            <Typography>{profile?.bio || 'No bio available'}</Typography>
+          )}
         </Box>
 
-        {/* Personality Tab */}
-        <TabPanel value={activeTab} index={0}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Personality Traits
-                  </Typography>
-                  {user.personalityTraits?.map((trait, index) => (
-                    <Box key={index} sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body1">{trait.trait}</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {trait.strength}%
-                        </Typography>
-                      </Box>
-                      <LinearProgress 
-                        variant="determinate" 
-                        value={trait.strength}
-                        sx={{ height: 8, borderRadius: 4 }}
+        {/* Info Section */}
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LocationIcon color="action" />
+              {isEditing ? (
+                <TextField
+                  name="location"
+                  value={editForm.location}
+                  onChange={handleChange}
+                  variant="standard"
+                  fullWidth
+                  placeholder="Location"
+                />
+              ) : (
+                <Typography>{profile?.location || 'Location not specified'}</Typography>
+              )}
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WorkIcon color="action" />
+              {isEditing ? (
+                <TextField
+                  name="occupation"
+                  value={editForm.occupation}
+                  onChange={handleChange}
+                  variant="standard"
+                  fullWidth
+                  placeholder="Occupation"
+                />
+              ) : (
+                <Typography>{profile?.occupation || 'Occupation not specified'}</Typography>
+              )}
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <SchoolIcon color="action" />
+              {isEditing ? (
+                <TextField
+                  name="education"
+                  value={editForm.education}
+                  onChange={handleChange}
+                  variant="standard"
+                  fullWidth
+                  placeholder="Education"
+                />
+              ) : (
+                <Typography>{profile?.education || 'Education not specified'}</Typography>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+
+        <Divider sx={{ my: 3 }} />
+
+        {/* Languages Section */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">Languages</Typography>
+            {isEditing && (
+              <IconButton onClick={handleAddLanguage} color="primary" size="small">
+                <AddIcon />
+              </IconButton>
+            )}
+          </Box>
+          <Grid container spacing={2}>
+            {(isEditing ? editForm.languages : profile?.languages || []).map((language, index) => (
+              <Grid item key={index}>
+                {isEditing ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TextField
+                      value={language.name}
+                      onChange={(e) => {
+                        const newLanguages = [...editForm.languages];
+                        newLanguages[index].name = e.target.value;
+                        setEditForm({ ...editForm, languages: newLanguages });
+                      }}
+                      variant="standard"
+                      size="small"
+                      placeholder="Language"
+                    />
+                    <IconButton onClick={() => handleRemoveLanguage(index)} size="small" color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Chip
+                    icon={<LanguageIcon />}
+                    label={language.name}
+                    variant="outlined"
+                  />
+                )}
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Interests Section */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">Interests</Typography>
+            {isEditing && (
+              <IconButton onClick={handleAddInterest} color="primary" size="small">
+                <AddIcon />
+              </IconButton>
+            )}
+          </Box>
+          <Grid container spacing={2}>
+            {(isEditing ? editForm.interests : profile?.interests || []).map((interest, index) => (
+              <Grid item key={index}>
+                {isEditing ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TextField
+                      value={interest}
+                      onChange={(e) => {
+                        const newInterests = [...editForm.interests];
+                        newInterests[index] = e.target.value;
+                        setEditForm({ ...editForm, interests: newInterests });
+                      }}
+                      variant="standard"
+                      size="small"
+                      placeholder="Interest"
+                    />
+                    <IconButton onClick={() => handleRemoveInterest(index)} size="small" color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Chip label={interest} />
+                )}
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Achievements Section */}
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">Achievements</Typography>
+            {isEditing && (
+              <IconButton onClick={handleAddAchievement} color="primary" size="small">
+                <AddIcon />
+              </IconButton>
+            )}
+          </Box>
+          <Grid container spacing={2}>
+            {(isEditing ? editForm.achievements : profile?.achievements || []).map((achievement, index) => (
+              <Grid item xs={12} key={index}>
+                {isEditing ? (
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <TextField
+                        value={achievement.title}
+                        onChange={(e) => {
+                          const newAchievements = [...editForm.achievements];
+                          newAchievements[index].title = e.target.value;
+                          setEditForm({ ...editForm, achievements: newAchievements });
+                        }}
+                        variant="standard"
+                        size="small"
+                        fullWidth
+                        placeholder="Achievement Title"
+                        sx={{ mb: 1 }}
+                      />
+                      <TextField
+                        value={achievement.description}
+                        onChange={(e) => {
+                          const newAchievements = [...editForm.achievements];
+                          newAchievements[index].description = e.target.value;
+                          setEditForm({ ...editForm, achievements: newAchievements });
+                        }}
+                        variant="standard"
+                        size="small"
+                        fullWidth
+                        multiline
+                        placeholder="Achievement Description"
                       />
                     </Box>
-                  ))}
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              {user.favoriteQuote?.text && (
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Favorite Quote
+                    <IconButton onClick={() => handleRemoveAchievement(index)} size="small" color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>{achievement.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {achievement.description}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                      <QuoteIcon color="primary" sx={{ fontSize: 40 }} />
-                      <Box>
-                        <Typography variant="body1" paragraph>
-                          "{user.favoriteQuote.text}"
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          — {user.favoriteQuote.author}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              )}
-            </Grid>
-          </Grid>
-        </TabPanel>
-
-        {/* Interests Tab */}
-        <TabPanel value={activeTab} index={1}>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {user.interests?.map((interest, index) => (
-              <Chip
-                key={index}
-                label={interest}
-                color="primary"
-                variant="outlined"
-              />
-            ))}
-          </Box>
-        </TabPanel>
-
-        {/* Languages Tab */}
-        <TabPanel value={activeTab} index={2}>
-          <Grid container spacing={2}>
-            {user.languages?.map((language, index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      {language.name}
-                    </Typography>
-                    <Chip
-                      label={language.proficiency}
-                      color="primary"
-                      variant="outlined"
-                    />
-                  </CardContent>
-                </Card>
+                  </Paper>
+                )}
               </Grid>
             ))}
           </Grid>
-        </TabPanel>
-
-        {/* Achievements Tab */}
-        <TabPanel value={activeTab} index={3}>
-          <Grid container spacing={2}>
-            {user.achievements?.map((achievement, index) => (
-              <Grid item xs={12} key={index}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                      <AchievementIcon color="primary" sx={{ fontSize: 40 }} />
-                      <Box>
-                        <Typography variant="h6" gutterBottom>
-                          {achievement.title}
-                        </Typography>
-                        <Typography variant="body1" paragraph>
-                          {achievement.description}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {new Date(achievement.date).toLocaleDateString()}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </TabPanel>
+        </Box>
       </Paper>
-
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="sections" type="section">
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef}>
-              {sections.map((section, index) => (
-                <Draggable
-                  key={section.id}
-                  draggableId={section.id}
-                  index={index}
-                  isDragDisabled={!isOwnProfile}
-                >
-                  {(provided) => (
-                    <Paper
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      elevation={3}
-                      sx={{ mb: 2, overflow: 'hidden' }}
-                    >
-                      <Box
-                        sx={{
-                          p: 2,
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderBottom: 1,
-                          borderColor: 'divider',
-                          bgcolor: 'background.default'
-                        }}
-                      >
-                        {isOwnProfile && (
-                          <div {...provided.dragHandleProps}>
-                            <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                          </div>
-                        )}
-                        
-                        {editingSection === section.id ? (
-                          <TextField
-                            value={section.title}
-                            onChange={(e) => setSections(sections.map(s =>
-                              s.id === section.id ? { ...s, title: e.target.value } : s
-                            ))}
-                            size="small"
-                            fullWidth
-                            sx={{ mr: 1 }}
-                          />
-                        ) : (
-                          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-                            {section.title}
-                          </Typography>
-                        )}
-
-                        {isOwnProfile && (
-                          <Box>
-                            {editingSection === section.id ? (
-                              <>
-                                <IconButton
-                                  onClick={() => handleUpdateSection(section.id, {
-                                    title: section.title
-                                  })}
-                                  color="primary"
-                                >
-                                  <SaveIcon />
-                                </IconButton>
-                                <IconButton
-                                  onClick={() => setEditingSection(null)}
-                                >
-                                  <CancelIcon />
-                                </IconButton>
-                              </>
-                            ) : (
-                              <>
-                                <IconButton
-                                  onClick={() => setEditingSection(section.id)}
-                                >
-                                  <EditIcon />
-                                </IconButton>
-                                <IconButton
-                                  onClick={(e) => {
-                                    setSectionMenuAnchor(e.currentTarget);
-                                    setSelectedSection(section);
-                                  }}
-                                >
-                                  <MoreIcon />
-                                </IconButton>
-                              </>
-                            )}
-                          </Box>
-                        )}
-                      </Box>
-
-                      <Droppable
-                        droppableId={section.id}
-                        type="content"
-                      >
-                        {(provided) => (
-                          <Box
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            sx={{ p: 2 }}
-                          >
-                            {section.content.map((content, index) => (
-                              <Draggable
-                                key={content.id}
-                                draggableId={content.id}
-                                index={index}
-                                isDragDisabled={!isOwnProfile}
-                              >
-                                {(provided) => (
-                                  <Card
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    sx={{ mb: 2 }}
-                                  >
-                                    <CardContent>
-                                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        {isOwnProfile && (
-                                          <div {...provided.dragHandleProps}>
-                                            <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                                          </div>
-                                        )}
-                                        
-                                        {editingContent === content.id ? (
-                                          <Box sx={{ flexGrow: 1 }}>
-                                            <TextField
-                                              value={content.title}
-                                              onChange={(e) => setSections(sections.map(s =>
-                                                s.id === section.id ? {
-                                                  ...s,
-                                                  content: s.content.map(c =>
-                                                    c.id === content.id
-                                                      ? { ...c, title: e.target.value }
-                                                      : c
-                                                  )
-                                                } : s
-                                              ))}
-                                              size="small"
-                                              fullWidth
-                                              sx={{ mb: 1 }}
-                                            />
-                                            <TextField
-                                              value={content.value || ''}
-                                              onChange={(e) => setSections(sections.map(s =>
-                                                s.id === section.id ? {
-                                                  ...s,
-                                                  content: s.content.map(c =>
-                                                    c.id === content.id
-                                                      ? { ...c, value: e.target.value }
-                                                      : c
-                                                  )
-                                                } : s
-                                              ))}
-                                              size="small"
-                                              fullWidth
-                                              multiline
-                                            />
-                                          </Box>
-                                        ) : (
-                                          <Box sx={{ flexGrow: 1 }}>
-                                            <Typography variant="subtitle1">
-                                              {content.title}
-                                            </Typography>
-                                            {content.value && (
-                                              <Typography variant="body1" color="text.secondary">
-                                                {content.value}
-                                              </Typography>
-                                            )}
-                                          </Box>
-                                        )}
-
-                                        {isOwnProfile && (
-                                          <Box>
-                                            {editingContent === content.id ? (
-                                              <>
-                                                <IconButton
-                                                  onClick={() => handleUpdateContent(
-                                                    section.id,
-                                                    content.id,
-                                                    {
-                                                      title: content.title,
-                                                      value: content.value
-                                                    }
-                                                  )}
-                                                  color="primary"
-                                                >
-                                                  <SaveIcon />
-                                                </IconButton>
-                                                <IconButton
-                                                  onClick={() => setEditingContent(null)}
-                                                >
-                                                  <CancelIcon />
-                                                </IconButton>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <IconButton
-                                                  onClick={() => setEditingContent(content.id)}
-                                                >
-                                                  <EditIcon />
-                                                </IconButton>
-                                                <IconButton
-                                                  onClick={(e) => {
-                                                    setContentMenuAnchor(e.currentTarget);
-                                                    setSelectedContent(content);
-                                                    setSelectedSection(section);
-                                                  }}
-                                                >
-                                                  <MoreIcon />
-                                                </IconButton>
-                                              </>
-                                            )}
-                                          </Box>
-                                        )}
-                                      </Box>
-                                    </CardContent>
-                                  </Card>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                            
-                            {isOwnProfile && (
-                              <Button
-                                startIcon={<AddIcon />}
-                                onClick={() => handleAddContent(section.id)}
-                                fullWidth
-                                sx={{ mt: 1 }}
-                              >
-                                Add Item
-                              </Button>
-                            )}
-                          </Box>
-                        )}
-                      </Droppable>
-                    </Paper>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-
-      {/* Section Menu */}
-      <Menu
-        anchorEl={sectionMenuAnchor}
-        open={Boolean(sectionMenuAnchor)}
-        onClose={() => setSectionMenuAnchor(null)}
-      >
-        <MenuItem
-          onClick={() => {
-            setSectionMenuAnchor(null);
-            if (selectedSection) {
-              handleDeleteSection(selectedSection.id);
-            }
-          }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Delete Section</ListItemText>
-        </MenuItem>
-      </Menu>
-
-      {/* Content Menu */}
-      <Menu
-        anchorEl={contentMenuAnchor}
-        open={Boolean(contentMenuAnchor)}
-        onClose={() => setContentMenuAnchor(null)}
-      >
-        <MenuItem
-          onClick={() => {
-            setContentMenuAnchor(null);
-            if (selectedSection && selectedContent) {
-              handleDeleteContent(selectedSection.id, selectedContent.id);
-            }
-          }}
-        >
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Delete Item</ListItemText>
-        </MenuItem>
-      </Menu>
-
-      {/* Add Section Dialog */}
-      <Dialog
-        open={editingSection === 'new'}
-        onClose={() => setEditingSection(null)}
-      >
-        <DialogTitle>Add New Section</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Section Title"
-            fullWidth
-            value={newSectionTitle}
-            onChange={(e) => setNewSectionTitle(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditingSection(null)}>Cancel</Button>
-          <Button onClick={handleAddSection} variant="contained">Add</Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 };
