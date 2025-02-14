@@ -163,7 +163,12 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
+      if (!newSection.title.trim()) {
+        setError('Section title is required');
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -171,18 +176,28 @@ const Profile = () => {
         },
         body: JSON.stringify({
           title: newSection.title,
-          type: 'container',
-          content: []
+          type: 'custom'
         })
       });
 
-      if (!response.ok) throw new Error('Failed to add section');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to add section');
+      }
       
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
+      const newSectionData = await response.json();
+      
+      // Update the profile state with the new section
+      setProfile(prev => ({
+        ...prev,
+        sections: [...(prev.sections || []), newSectionData]
+      }));
+      
       setNewSectionDialog(false);
-      setNewSection({ title: '', type: 'container', content: [] });
+      setNewSection({ title: '', type: 'custom', content: [] });
+      setError(null);
     } catch (error) {
+      console.error('Error adding section:', error);
       setError(error.message);
     }
   };
@@ -218,26 +233,36 @@ const Profile = () => {
     }
   };
 
-  const handleDeleteSection = async (sectionId) => {
+  const handleDeleteSection = async (sectionId, event) => {
     try {
+      event.stopPropagation(); // Prevent accordion from toggling
       const token = localStorage.getItem('token');
       if (!token) {
         navigate('/login');
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections/${sectionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) throw new Error('Failed to delete section');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete section');
+      }
+
+      // Remove the section from the profile state
+      setProfile(prev => ({
+        ...prev,
+        sections: prev.sections.filter(section => section.id !== sectionId)
+      }));
       
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
+      setError(null);
     } catch (error) {
+      console.error('Error deleting section:', error);
       setError(error.message);
     }
   };
@@ -261,7 +286,12 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
+      if (!newContent.content.trim()) {
+        setError('Content is required');
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections/${selectedSection}/content`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -270,38 +300,67 @@ const Profile = () => {
         body: JSON.stringify(newContent)
       });
 
-      if (!response.ok) throw new Error('Failed to add content');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to add content');
+      }
       
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
+      const newContentData = await response.json();
+      
+      // Update the profile state with the new content
+      setProfile(prev => ({
+        ...prev,
+        sections: prev.sections.map(section => 
+          section.id === selectedSection
+            ? { ...section, content: [...section.content, newContentData] }
+            : section
+        )
+      }));
+      
       setContentDialog(false);
       setNewContent({ type: 'text', title: '', content: '', url: '' });
       setSelectedSection(null);
+      setError(null);
     } catch (error) {
+      console.error('Error adding content:', error);
       setError(error.message);
     }
   };
 
-  const handleDeleteContent = async (sectionId, contentId) => {
+  const handleDeleteContent = async (sectionId, contentId, event) => {
     try {
+      event.stopPropagation(); // Prevent accordion from toggling
       const token = localStorage.getItem('token');
       if (!token) {
         navigate('/login');
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections/${sectionId}/content/${contentId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) throw new Error('Failed to delete content');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete content');
+      }
+
+      // Remove the content from the profile state
+      setProfile(prev => ({
+        ...prev,
+        sections: prev.sections.map(section =>
+          section.id === sectionId
+            ? { ...section, content: section.content.filter(item => item.id !== contentId) }
+            : section
+        )
+      }));
       
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
+      setError(null);
     } catch (error) {
+      console.error('Error deleting content:', error);
       setError(error.message);
     }
   };
@@ -367,8 +426,8 @@ const Profile = () => {
               {profile?.username?.[0]?.toUpperCase()}
             </Avatar>
             <Box>
-              <Typography variant="h4">{profile.username}</Typography>
-              <Chip label={profile.mbtiType} color="primary" />
+              <Typography variant="h4">{profile?.username}</Typography>
+              <Chip label={profile?.mbtiType} color="primary" />
             </Box>
           </Box>
           {isOwnProfile && (
@@ -382,8 +441,14 @@ const Profile = () => {
           )}
         </Box>
 
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
         {/* Sections */}
-        {profile.sections?.map((section) => (
+        {profile?.sections?.map((section) => (
           <Accordion
             key={section.id}
             expanded={expandedSection === section.id}
@@ -395,7 +460,7 @@ const Profile = () => {
               sx={{ 
                 '&:hover': { 
                   bgcolor: 'action.hover',
-                  '& .edit-buttons': { opacity: 1 }
+                  '& .section-actions': { opacity: 1 }
                 }
               }}
             >
@@ -403,7 +468,8 @@ const Profile = () => {
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'space-between',
-                width: '100%'
+                width: '100%',
+                pr: 2
               }}>
                 {editingSection === section.id ? (
                   <TextField
@@ -412,16 +478,25 @@ const Profile = () => {
                     variant="standard"
                     fullWidth
                     sx={{ mr: 2 }}
+                    onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
                   <Typography variant="h6">{section.title}</Typography>
                 )}
                 {isOwnProfile && (
-                  <Box className="edit-buttons" sx={{ opacity: 0, transition: 'opacity 0.2s' }}>
-                    <IconButton size="small" onClick={() => handleEditSection(section.id)}>
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton size="small" onClick={() => handleDeleteSection(section.id)}>
+                  <Box 
+                    className="section-actions" 
+                    sx={{ 
+                      opacity: 0, 
+                      transition: 'opacity 0.2s',
+                      display: 'flex',
+                      gap: 1
+                    }}
+                  >
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleDeleteSection(section.id, e)}
+                    >
                       <DeleteIcon />
                     </IconButton>
                   </Box>
@@ -448,10 +523,16 @@ const Profile = () => {
                   >
                     {renderContent(item)}
                     {isOwnProfile && (
-                      <Box className="content-actions" sx={{ opacity: 0, transition: 'opacity 0.2s' }}>
+                      <Box 
+                        className="content-actions" 
+                        sx={{ 
+                          opacity: 0, 
+                          transition: 'opacity 0.2s'
+                        }}
+                      >
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteContent(section.id, item.id)}
+                          onClick={(e) => handleDeleteContent(section.id, item.id, e)}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -475,103 +556,121 @@ const Profile = () => {
             </AccordionDetails>
           </Accordion>
         ))}
+
+        {/* Add Section Dialog */}
+        <Dialog open={newSectionDialog} onClose={() => setNewSectionDialog(false)}>
+          <DialogTitle>Add New Section</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Section Title"
+              fullWidth
+              value={newSection.title}
+              onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
+              error={!!error && error.includes('title')}
+              helperText={error && error.includes('title') ? error : ''}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setNewSectionDialog(false);
+              setError(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNewSection} variant="contained">
+              Add
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Add Content Dialog */}
+        <Dialog open={contentDialog} onClose={() => setContentDialog(false)}>
+          <DialogTitle>Add Content</DialogTitle>
+          <DialogContent>
+            <TextField
+              select
+              margin="dense"
+              label="Content Type"
+              fullWidth
+              value={newContent.type}
+              onChange={(e) => setNewContent({ ...newContent, type: e.target.value })}
+            >
+              <MenuItem value="text">Text</MenuItem>
+              <MenuItem value="link">Link</MenuItem>
+              <MenuItem value="achievement">Achievement</MenuItem>
+            </TextField>
+
+            {newContent.type === 'link' && (
+              <TextField
+                margin="dense"
+                label="Title"
+                fullWidth
+                value={newContent.title}
+                onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+              />
+            )}
+
+            {newContent.type === 'achievement' && (
+              <TextField
+                margin="dense"
+                label="Title"
+                fullWidth
+                value={newContent.title}
+                onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+              />
+            )}
+
+            {newContent.type === 'text' && (
+              <TextField
+                margin="dense"
+                label="Content"
+                fullWidth
+                multiline
+                rows={4}
+                value={newContent.content}
+                onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
+                error={!!error && error.includes('content')}
+                helperText={error && error.includes('content') ? error : ''}
+              />
+            )}
+
+            {newContent.type === 'link' && (
+              <TextField
+                margin="dense"
+                label="URL"
+                fullWidth
+                value={newContent.url}
+                onChange={(e) => setNewContent({ ...newContent, url: e.target.value })}
+              />
+            )}
+
+            {newContent.type === 'achievement' && (
+              <TextField
+                margin="dense"
+                label="Description"
+                fullWidth
+                multiline
+                rows={4}
+                value={newContent.content}
+                onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
+              />
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => {
+              setContentDialog(false);
+              setError(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveContent} variant="contained">
+              Add
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
-
-      {/* Add Section Dialog */}
-      <Dialog open={newSectionDialog} onClose={() => setNewSectionDialog(false)}>
-        <DialogTitle>Add New Section</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Section Title"
-            fullWidth
-            value={newSection.title}
-            onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNewSectionDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveNewSection} variant="contained">Add</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add Content Dialog */}
-      <Dialog open={contentDialog} onClose={() => setContentDialog(false)}>
-        <DialogTitle>Add Content</DialogTitle>
-        <DialogContent>
-          <TextField
-            select
-            margin="dense"
-            label="Content Type"
-            fullWidth
-            value={newContent.type}
-            onChange={(e) => setNewContent({ ...newContent, type: e.target.value })}
-          >
-            <MenuItem value="text">Text</MenuItem>
-            <MenuItem value="link">Link</MenuItem>
-            <MenuItem value="achievement">Achievement</MenuItem>
-          </TextField>
-
-          {newContent.type === 'link' && (
-            <TextField
-              margin="dense"
-              label="Title"
-              fullWidth
-              value={newContent.title}
-              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
-            />
-          )}
-
-          {newContent.type === 'achievement' && (
-            <TextField
-              margin="dense"
-              label="Title"
-              fullWidth
-              value={newContent.title}
-              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
-            />
-          )}
-
-          {newContent.type === 'text' && (
-            <TextField
-              margin="dense"
-              label="Content"
-              fullWidth
-              multiline
-              rows={4}
-              value={newContent.content}
-              onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
-            />
-          )}
-
-          {newContent.type === 'link' && (
-            <TextField
-              margin="dense"
-              label="URL"
-              fullWidth
-              value={newContent.url}
-              onChange={(e) => setNewContent({ ...newContent, url: e.target.value })}
-            />
-          )}
-
-          {newContent.type === 'achievement' && (
-            <TextField
-              margin="dense"
-              label="Description"
-              fullWidth
-              multiline
-              rows={4}
-              value={newContent.content}
-              onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setContentDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveContent} variant="contained">Add</Button>
-        </DialogActions>
-      </Dialog>
     </Container>
   );
 };
