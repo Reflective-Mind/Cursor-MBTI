@@ -316,7 +316,6 @@ const Profile = () => {
         },
         body: JSON.stringify({
           description: newContent.content,
-          value: newContent.content,
           contentType: 'text'
         })
       });
@@ -339,7 +338,7 @@ const Profile = () => {
                   ...section, 
                   content: [...(section.content || []), {
                     ...newContentData,
-                    value: newContent.content // Ensure the content is set in the value field
+                    description: newContent.content // Ensure the content is set in the description field
                   }]
                 }
               : section
@@ -400,7 +399,7 @@ const Profile = () => {
     }
   };
 
-  const renderSectionContent = (item) => {
+  const renderSectionContent = (item, section) => {
     console.log('Rendering content item:', item);
     return (
       <Box
@@ -563,7 +562,7 @@ const Profile = () => {
               </AccordionSummary>
               <AccordionDetails sx={{ p: 2 }}>
                 <Box sx={{ pl: 2 }}>
-                  {section.content?.map((item) => renderSectionContent(item))}
+                  {section.content?.map((item) => renderSectionContent(item, section))}
                   {(!section.content || section.content.length === 0) && (
                     <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
                       No content yet. {isOwnProfile ? 'Click "Add Text" to add some content.' : ''}
