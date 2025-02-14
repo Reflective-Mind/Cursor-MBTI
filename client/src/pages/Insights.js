@@ -1,23 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Box,
   Container,
+  Typography,
+  Box,
+  Paper,
   Grid,
   Card,
   CardContent,
-  Typography,
+  Button,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+  Drawer,
   useTheme,
   useMediaQuery,
-  Paper,
+  Fab,
 } from '@mui/material';
 import {
-  Psychology as PsychologyIcon,
-  Favorite as RelationshipsIcon,
+  People as RelationshipsIcon,
   TrendingUp as GrowthIcon,
   Work as CareerIcon,
   School as LearningIcon,
-  Group as CommunicationIcon,
+  Chat as ChatIcon,
+  Menu as MenuIcon,
+  NavigateNext as NextIcon,
+  NavigateBefore as PrevIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 
 const InsightCard = ({ title, icon, description }) => {
   const theme = useTheme();
@@ -69,86 +81,208 @@ const InsightCard = ({ title, icon, description }) => {
 const Insights = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [currentSection, setCurrentSection] = useState('relationships');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const navigate = useNavigate();
 
-  const insights = [
+  const sections = [
     {
-      title: 'Personality Overview',
-      icon: <PsychologyIcon fontSize={isMobile ? "medium" : "large"} color="primary" />,
-      description: 'Understand your MBTI type in depth, including cognitive functions, strengths, and potential areas for growth.',
-    },
-    {
+      id: 'relationships',
       title: 'Relationships',
-      icon: <RelationshipsIcon fontSize={isMobile ? "medium" : "large"} color="error" />,
-      description: 'Explore compatibility with other types and learn how to build stronger personal and professional relationships.',
+      icon: <RelationshipsIcon />,
+      content: 'Your relationship insights will be displayed here...'
     },
     {
-      title: 'Growth & Development',
-      icon: <GrowthIcon fontSize={isMobile ? "medium" : "large"} color="success" />,
-      description: 'Discover personalized strategies for personal development and ways to leverage your natural preferences.',
+      id: 'growth',
+      title: 'Personal Growth',
+      icon: <GrowthIcon />,
+      content: 'Your growth opportunities will be displayed here...'
     },
     {
+      id: 'career',
       title: 'Career Path',
-      icon: <CareerIcon fontSize={isMobile ? "medium" : "large"} color="info" />,
-      description: 'Find career paths that align with your personality type and learn how to excel in your chosen field.',
+      icon: <CareerIcon />,
+      content: 'Your career insights will be displayed here...'
     },
     {
+      id: 'learning',
       title: 'Learning Style',
-      icon: <LearningIcon fontSize={isMobile ? "medium" : "large"} color="secondary" />,
-      description: 'Understand your optimal learning approach and how to adapt your study habits for better results.',
-    },
-    {
-      title: 'Communication',
-      icon: <CommunicationIcon fontSize={isMobile ? "medium" : "large"} color="warning" />,
-      description: 'Learn effective communication strategies tailored to your type and how to better connect with others.',
-    },
+      icon: <LearningIcon />,
+      content: 'Your learning style insights will be displayed here...'
+    }
   ];
 
+  const currentSectionIndex = sections.findIndex(s => s.id === currentSection);
+
+  const handleNext = () => {
+    const nextIndex = (currentSectionIndex + 1) % sections.length;
+    setCurrentSection(sections[nextIndex].id);
+  };
+
+  const handlePrev = () => {
+    const prevIndex = currentSectionIndex === 0 ? sections.length - 1 : currentSectionIndex - 1;
+    setCurrentSection(sections[prevIndex].id);
+  };
+
+  const handleChatClick = () => {
+    navigate('/chat');
+  };
+
+  const currentSectionData = sections.find(s => s.id === currentSection);
+
   return (
-    <Box 
-      sx={{ 
-        flexGrow: 1,
-        minHeight: '100vh',
-        pt: { xs: '56px', sm: '64px' }, // Account for fixed navbar
-        pb: 4,
-        backgroundColor: theme.palette.background.default,
-      }}
-    >
-      <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
-        <Typography 
-          variant={isMobile ? "h5" : "h4"} 
-          component="h1" 
-          gutterBottom
-          sx={{ 
-            mb: { xs: 2, sm: 4 },
-            px: { xs: 2, sm: 0 },
-          }}
-        >
-          Personality Insights
-        </Typography>
-        
-        <Grid 
-          container 
-          spacing={isMobile ? 0 : 3}
-          sx={{
-            px: { xs: 0, sm: 0 },
-          }}
-        >
-          {insights.map((insight, index) => (
-            <Grid 
-              item 
-              xs={12} 
-              md={6} 
-              key={insight.title}
-              sx={{
-                mb: isMobile ? 0 : 3,
-              }}
-            >
-              <InsightCard {...insight} />
-            </Grid>
-          ))}
-        </Grid>
-      </Container>
-    </Box>
+    <Container maxWidth="lg" sx={{ 
+      py: 2,
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      mt: isMobile ? '56px' : 0 // Add top margin on mobile to account for fixed navbar
+    }}>
+      {/* Mobile Menu Button */}
+      {isMobile && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <IconButton 
+            color="primary" 
+            onClick={() => setDrawerOpen(true)}
+            sx={{ mr: 1 }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h5" component="h1" sx={{ flex: 1 }}>
+            {currentSectionData.title}
+          </Typography>
+          <IconButton
+            color="primary"
+            onClick={handleChatClick}
+            sx={{ ml: 1 }}
+          >
+            <ChatIcon />
+          </IconButton>
+        </Box>
+      )}
+
+      {/* Desktop Header */}
+      {!isMobile && (
+        <Box sx={{ mb: 4, textAlign: 'center' }}>
+          <Typography variant="h3" component="h1" gutterBottom>
+            Personality Insights
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
+            Discover deeper insights about your personality type
+          </Typography>
+        </Box>
+      )}
+
+      {/* Main Content */}
+      <Box sx={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: isMobile ? 'column' : 'row', 
+        gap: 2,
+        overflow: isMobile ? 'auto' : 'visible' // Enable scrolling on mobile
+      }}>
+        {/* Desktop Navigation */}
+        {!isMobile && (
+          <Paper sx={{ width: 240, p: 2 }}>
+            <List>
+              {sections.map((section) => (
+                <ListItem
+                  key={section.id}
+                  button
+                  selected={currentSection === section.id}
+                  onClick={() => setCurrentSection(section.id)}
+                >
+                  <ListItemIcon>{section.icon}</ListItemIcon>
+                  <ListItemText primary={section.title} />
+                </ListItem>
+              ))}
+              <Divider sx={{ my: 2 }} />
+              <ListItem button onClick={handleChatClick}>
+                <ListItemIcon><ChatIcon /></ListItemIcon>
+                <ListItemText primary="Ask AI Assistant" />
+              </ListItem>
+            </List>
+          </Paper>
+        )}
+
+        {/* Content Area */}
+        <Paper sx={{ 
+          flex: 1, 
+          p: 3, 
+          position: 'relative',
+          overflowY: isMobile ? 'auto' : 'visible', // Enable scrolling on mobile
+          maxHeight: isMobile ? 'calc(100vh - 180px)' : 'none' // Limit height on mobile
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            height: '100%',
+            gap: 2
+          }}>
+            {!isMobile && (
+              <Typography variant="h4" gutterBottom>
+                {currentSectionData.title}
+              </Typography>
+            )}
+            <Typography>{currentSectionData.content}</Typography>
+
+            {/* Mobile Navigation Arrows */}
+            {isMobile && (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                mt: 'auto',
+                pt: 2,
+                position: 'sticky',
+                bottom: 0,
+                backgroundColor: theme.palette.background.paper,
+                zIndex: 1
+              }}>
+                <IconButton onClick={handlePrev} color="primary">
+                  <PrevIcon />
+                </IconButton>
+                <Typography variant="caption" sx={{ alignSelf: 'center' }}>
+                  {currentSectionIndex + 1} / {sections.length}
+                </Typography>
+                <IconButton onClick={handleNext} color="primary">
+                  <NextIcon />
+                </IconButton>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Mobile Navigation Drawer */}
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      >
+        <Box sx={{ width: 250 }}>
+          <List>
+            <ListItem>
+              <Typography variant="h6">Sections</Typography>
+            </ListItem>
+            <Divider />
+            {sections.map((section) => (
+              <ListItem
+                key={section.id}
+                button
+                selected={currentSection === section.id}
+                onClick={() => {
+                  setCurrentSection(section.id);
+                  setDrawerOpen(false);
+                }}
+              >
+                <ListItemIcon>{section.icon}</ListItemIcon>
+                <ListItemText primary={section.title} />
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
+    </Container>
   );
 };
 
