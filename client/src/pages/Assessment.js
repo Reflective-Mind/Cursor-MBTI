@@ -1493,6 +1493,7 @@ const Assessment = () => {
   const handleNext = async () => {
     if (!questions[activeStep]) {
       console.error('No questions found for current step');
+      setError('Error: No questions found for current step');
       return;
     }
 
@@ -1507,11 +1508,19 @@ const Assessment = () => {
 
     if (isLastStep) {
       try {
+        setError(null); // Clear any previous errors
         setIsLoading(true);
+
+        // Validate test selection
+        if (!selectedTest || !selectedTest.id) {
+          throw new Error('No test type selected');
+        }
+
+        // Calculate personality result
         const result = calculatePersonalityType();
         console.log('Calculated personality result:', result);
-        setPersonalityType(result.type);
         
+        // Validate authentication
         const token = localStorage.getItem('token');
         if (!token) {
           navigate('/login');
@@ -1525,10 +1534,6 @@ const Assessment = () => {
           'expert': 'mbti-100'
         };
 
-        if (!selectedTest || !selectedTest.id) {
-          throw new Error('No test type selected');
-        }
-
         // Prepare questions data
         const allQuestions = questions.reduce((acc, category) => {
           return acc.concat(category.questions.map(q => ({
@@ -1538,6 +1543,19 @@ const Assessment = () => {
           })));
         }, []);
 
+        // Prepare request payload
+        const payload = {
+          testType: testTypeMapping[selectedTest.id],
+          result: result,
+          answers: Object.entries(answers).map(([questionId, value]) => ({
+            questionId,
+            answer: value
+          })),
+          questions: allQuestions
+        };
+
+        console.log('Submitting test results with payload:', payload);
+
         // Store test results
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me/test-results`, {
           method: 'POST',
@@ -1545,31 +1563,28 @@ const Assessment = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            testType: testTypeMapping[selectedTest.id],
-            result: result,
-            answers: Object.entries(answers).map(([questionId, value]) => ({
-              questionId,
-              answer: value
-            })),
-            questions: allQuestions
-          })
+          body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
-          throw new Error('Failed to store test results');
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.message || `Failed to store test results: ${response.status}`);
         }
 
         const responseData = await response.json();
         console.log('Server response:', responseData);
 
+        // Save results locally
+        setPersonalityType(result.type);
         localStorage.setItem('mbtiType', result.type);
         localStorage.setItem('mbtiDetails', JSON.stringify(result));
-        console.log('Saved assessment details to localStorage and server');
+        
+        console.log('Successfully saved assessment details');
         setIsComplete(true);
       } catch (error) {
         console.error('Error storing test results:', error);
-        setError('Failed to store test results. Please try again.');
+        setError(error.message || 'Failed to store test results. Please try again.');
+        setIsComplete(false);
       } finally {
         setIsLoading(false);
       }
