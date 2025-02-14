@@ -25,6 +25,10 @@ import {
   useTheme,
   useMediaQuery,
   Link,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -40,9 +44,14 @@ import {
   Language as WebsiteIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  DragIndicator as DragIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  MoreVert as MoreIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 // TabPanel component for profile sections
 const TabPanel = ({ children, value, index, ...other }) => (
@@ -88,6 +97,16 @@ const Profile = () => {
     languages: [],
     achievements: []
   });
+  const [sections, setSections] = useState([]);
+  const [editingSection, setEditingSection] = useState(null);
+  const [editingContent, setEditingContent] = useState(null);
+  const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [newContentTitle, setNewContentTitle] = useState('');
+  const [newContentValue, setNewContentValue] = useState('');
+  const [sectionMenuAnchor, setSectionMenuAnchor] = useState(null);
+  const [contentMenuAnchor, setContentMenuAnchor] = useState(null);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [selectedContent, setSelectedContent] = useState(null);
 
   const navigate = useNavigate();
 
@@ -321,6 +340,216 @@ const Profile = () => {
       ...prev,
       interests: prev.interests.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleAddSection = async () => {
+    try {
+      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title: newSectionTitle || 'New Section' })
+      });
+
+      if (!response.ok) throw new Error('Failed to add section');
+      
+      const newSection = await response.json();
+      setSections([...sections, newSection]);
+      setNewSectionTitle('');
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleUpdateSection = async (sectionId, updates) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) throw new Error('Failed to update section');
+      
+      const updatedSections = await response.json();
+      setSections(updatedSections);
+      setEditingSection(null);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleDeleteSection = async (sectionId) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to delete section');
+      
+      setSections(sections.filter(s => s.id !== sectionId));
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleAddContent = async (sectionId) => {
+    try {
+      const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}/content`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: newContentTitle || 'New Item',
+          value: newContentValue
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to add content');
+      
+      const newContent = await response.json();
+      setSections(sections.map(section => 
+        section.id === sectionId
+          ? { ...section, content: [...section.content, newContent] }
+          : section
+      ));
+      setNewContentTitle('');
+      setNewContentValue('');
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleUpdateContent = async (sectionId, contentId, updates) => {
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/users/${user._id}/sections/${sectionId}/content/${contentId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updates)
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to update content');
+      
+      const updatedContent = await response.json();
+      setSections(sections.map(section => 
+        section.id === sectionId
+          ? {
+              ...section,
+              content: section.content.map(c => 
+                c.id === contentId ? updatedContent : c
+              )
+            }
+          : section
+      ));
+      setEditingContent(null);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleDeleteContent = async (sectionId, contentId) => {
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/users/${user._id}/sections/${sectionId}/content/${contentId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to delete content');
+      
+      setSections(sections.map(section => 
+        section.id === sectionId
+          ? {
+              ...section,
+              content: section.content.filter(c => c.id !== contentId)
+            }
+          : section
+      ));
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleDragEnd = async (result) => {
+    if (!result.destination) return;
+
+    const { source, destination, type } = result;
+
+    if (type === 'section') {
+      const reorderedSections = Array.from(sections);
+      const [removed] = reorderedSections.splice(source.index, 1);
+      reorderedSections.splice(destination.index, 0, removed);
+
+      // Update order for all affected sections
+      const updates = reorderedSections.map((section, index) => 
+        handleUpdateSection(section.id, { order: index })
+      );
+      
+      await Promise.all(updates);
+      setSections(reorderedSections);
+    } else if (type === 'content') {
+      const sourceSection = sections.find(s => s.id === source.droppableId);
+      const destSection = sections.find(s => s.id === destination.droppableId);
+
+      if (sourceSection && destSection) {
+        const newSections = [...sections];
+        const sourceContent = [...sourceSection.content];
+        const destContent = source.droppableId === destination.droppableId
+          ? sourceContent
+          : [...destSection.content];
+
+        const [removed] = sourceContent.splice(source.index, 1);
+        destContent.splice(destination.index, 0, removed);
+
+        // Update the sections
+        if (source.droppableId === destination.droppableId) {
+          // Same section, just reorder
+          const updates = destContent.map((content, index) =>
+            handleUpdateContent(destSection.id, content.id, { order: index })
+          );
+          await Promise.all(updates);
+        } else {
+          // Different sections
+          const sourceUpdates = sourceContent.map((content, index) =>
+            handleUpdateContent(sourceSection.id, content.id, { order: index })
+          );
+          const destUpdates = destContent.map((content, index) =>
+            handleUpdateContent(destSection.id, content.id, { order: index })
+          );
+          await Promise.all([...sourceUpdates, ...destUpdates]);
+        }
+
+        setSections(newSections.map(section => {
+          if (section.id === source.droppableId) {
+            return { ...section, content: sourceContent };
+          }
+          if (section.id === destination.droppableId) {
+            return { ...section, content: destContent };
+          }
+          return section;
+        }));
+      }
+    }
   };
 
   if (loading) {
@@ -887,6 +1116,324 @@ const Profile = () => {
         <DialogActions>
           <Button onClick={() => setIsEditing(false)}>Cancel</Button>
           <Button onClick={handleEditSubmit} variant="contained">Save Changes</Button>
+        </DialogActions>
+      </Dialog>
+
+      {isOwnProfile && (
+        <Box sx={{ mb: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setEditingSection('new')}
+          >
+            Add Section
+          </Button>
+        </Box>
+      )}
+
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="sections" type="section">
+          {(provided) => (
+            <div {...provided.droppableProps} ref={provided.innerRef}>
+              {sections.map((section, index) => (
+                <Draggable
+                  key={section.id}
+                  draggableId={section.id}
+                  index={index}
+                  isDragDisabled={!isOwnProfile}
+                >
+                  {(provided) => (
+                    <Paper
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      elevation={3}
+                      sx={{ mb: 2, overflow: 'hidden' }}
+                    >
+                      <Box
+                        sx={{
+                          p: 2,
+                          display: 'flex',
+                          alignItems: 'center',
+                          borderBottom: 1,
+                          borderColor: 'divider',
+                          bgcolor: 'background.default'
+                        }}
+                      >
+                        {isOwnProfile && (
+                          <div {...provided.dragHandleProps}>
+                            <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                          </div>
+                        )}
+                        
+                        {editingSection === section.id ? (
+                          <TextField
+                            value={section.title}
+                            onChange={(e) => setSections(sections.map(s =>
+                              s.id === section.id ? { ...s, title: e.target.value } : s
+                            ))}
+                            size="small"
+                            fullWidth
+                            sx={{ mr: 1 }}
+                          />
+                        ) : (
+                          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+                            {section.title}
+                          </Typography>
+                        )}
+
+                        {isOwnProfile && (
+                          <Box>
+                            {editingSection === section.id ? (
+                              <>
+                                <IconButton
+                                  onClick={() => handleUpdateSection(section.id, {
+                                    title: section.title
+                                  })}
+                                  color="primary"
+                                >
+                                  <SaveIcon />
+                                </IconButton>
+                                <IconButton
+                                  onClick={() => setEditingSection(null)}
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </>
+                            ) : (
+                              <>
+                                <IconButton
+                                  onClick={() => setEditingSection(section.id)}
+                                >
+                                  <EditIcon />
+                                </IconButton>
+                                <IconButton
+                                  onClick={(e) => {
+                                    setSectionMenuAnchor(e.currentTarget);
+                                    setSelectedSection(section);
+                                  }}
+                                >
+                                  <MoreIcon />
+                                </IconButton>
+                              </>
+                            )}
+                          </Box>
+                        )}
+                      </Box>
+
+                      <Droppable
+                        droppableId={section.id}
+                        type="content"
+                      >
+                        {(provided) => (
+                          <Box
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            sx={{ p: 2 }}
+                          >
+                            {section.content.map((content, index) => (
+                              <Draggable
+                                key={content.id}
+                                draggableId={content.id}
+                                index={index}
+                                isDragDisabled={!isOwnProfile}
+                              >
+                                {(provided) => (
+                                  <Card
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    sx={{ mb: 2 }}
+                                  >
+                                    <CardContent>
+                                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                        {isOwnProfile && (
+                                          <div {...provided.dragHandleProps}>
+                                            <DragIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                          </div>
+                                        )}
+                                        
+                                        {editingContent === content.id ? (
+                                          <Box sx={{ flexGrow: 1 }}>
+                                            <TextField
+                                              value={content.title}
+                                              onChange={(e) => setSections(sections.map(s =>
+                                                s.id === section.id ? {
+                                                  ...s,
+                                                  content: s.content.map(c =>
+                                                    c.id === content.id
+                                                      ? { ...c, title: e.target.value }
+                                                      : c
+                                                  )
+                                                } : s
+                                              ))}
+                                              size="small"
+                                              fullWidth
+                                              sx={{ mb: 1 }}
+                                            />
+                                            <TextField
+                                              value={content.value || ''}
+                                              onChange={(e) => setSections(sections.map(s =>
+                                                s.id === section.id ? {
+                                                  ...s,
+                                                  content: s.content.map(c =>
+                                                    c.id === content.id
+                                                      ? { ...c, value: e.target.value }
+                                                      : c
+                                                  )
+                                                } : s
+                                              ))}
+                                              size="small"
+                                              fullWidth
+                                              multiline
+                                            />
+                                          </Box>
+                                        ) : (
+                                          <Box sx={{ flexGrow: 1 }}>
+                                            <Typography variant="subtitle1">
+                                              {content.title}
+                                            </Typography>
+                                            {content.value && (
+                                              <Typography variant="body1" color="text.secondary">
+                                                {content.value}
+                                              </Typography>
+                                            )}
+                                          </Box>
+                                        )}
+
+                                        {isOwnProfile && (
+                                          <Box>
+                                            {editingContent === content.id ? (
+                                              <>
+                                                <IconButton
+                                                  onClick={() => handleUpdateContent(
+                                                    section.id,
+                                                    content.id,
+                                                    {
+                                                      title: content.title,
+                                                      value: content.value
+                                                    }
+                                                  )}
+                                                  color="primary"
+                                                >
+                                                  <SaveIcon />
+                                                </IconButton>
+                                                <IconButton
+                                                  onClick={() => setEditingContent(null)}
+                                                >
+                                                  <CancelIcon />
+                                                </IconButton>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <IconButton
+                                                  onClick={() => setEditingContent(content.id)}
+                                                >
+                                                  <EditIcon />
+                                                </IconButton>
+                                                <IconButton
+                                                  onClick={(e) => {
+                                                    setContentMenuAnchor(e.currentTarget);
+                                                    setSelectedContent(content);
+                                                    setSelectedSection(section);
+                                                  }}
+                                                >
+                                                  <MoreIcon />
+                                                </IconButton>
+                                              </>
+                                            )}
+                                          </Box>
+                                        )}
+                                      </Box>
+                                    </CardContent>
+                                  </Card>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                            
+                            {isOwnProfile && (
+                              <Button
+                                startIcon={<AddIcon />}
+                                onClick={() => handleAddContent(section.id)}
+                                fullWidth
+                                sx={{ mt: 1 }}
+                              >
+                                Add Item
+                              </Button>
+                            )}
+                          </Box>
+                        )}
+                      </Droppable>
+                    </Paper>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
+
+      {/* Section Menu */}
+      <Menu
+        anchorEl={sectionMenuAnchor}
+        open={Boolean(sectionMenuAnchor)}
+        onClose={() => setSectionMenuAnchor(null)}
+      >
+        <MenuItem
+          onClick={() => {
+            setSectionMenuAnchor(null);
+            if (selectedSection) {
+              handleDeleteSection(selectedSection.id);
+            }
+          }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete Section</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* Content Menu */}
+      <Menu
+        anchorEl={contentMenuAnchor}
+        open={Boolean(contentMenuAnchor)}
+        onClose={() => setContentMenuAnchor(null)}
+      >
+        <MenuItem
+          onClick={() => {
+            setContentMenuAnchor(null);
+            if (selectedSection && selectedContent) {
+              handleDeleteContent(selectedSection.id, selectedContent.id);
+            }
+          }}
+        >
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Delete Item</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* Add Section Dialog */}
+      <Dialog
+        open={editingSection === 'new'}
+        onClose={() => setEditingSection(null)}
+      >
+        <DialogTitle>Add New Section</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Section Title"
+            fullWidth
+            value={newSectionTitle}
+            onChange={(e) => setNewSectionTitle(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingSection(null)}>Cancel</Button>
+          <Button onClick={handleAddSection} variant="contained">Add</Button>
         </DialogActions>
       </Dialog>
     </Container>

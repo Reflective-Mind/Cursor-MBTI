@@ -109,6 +109,88 @@ const userSchema = new mongoose.Schema({
       enum: ['classic', 'modern', 'minimal'],
       default: 'classic'
     }
+  },
+  profileSections: [{
+    id: String,
+    title: String,
+    order: Number,
+    isVisible: {
+      type: Boolean,
+      default: true
+    },
+    type: {
+      type: String,
+      enum: ['default', 'custom'],
+      default: 'custom'
+    },
+    content: [{
+      id: String,
+      title: String,
+      order: Number,
+      description: String,
+      value: mongoose.Schema.Types.Mixed,
+      contentType: {
+        type: String,
+        enum: ['text', 'list', 'progress', 'link', 'date'],
+        default: 'text'
+      }
+    }]
+  }],
+  defaultSections: {
+    personality: {
+      isVisible: {
+        type: Boolean,
+        default: true
+      },
+      order: {
+        type: Number,
+        default: 0
+      }
+    },
+    interests: {
+      isVisible: {
+        type: Boolean,
+        default: true
+      },
+      order: {
+        type: Number,
+        default: 1
+      }
+    },
+    languages: {
+      isVisible: {
+        type: Boolean,
+        default: true
+      },
+      order: {
+        type: Number,
+        default: 2
+      }
+    },
+    achievements: {
+      isVisible: {
+        type: Boolean,
+        default: true
+      },
+      order: {
+        type: Number,
+        default: 3
+      }
+    }
+  },
+  sectionLimits: {
+    maxMainSections: {
+      type: Number,
+      default: 10
+    },
+    maxSubSections: {
+      type: Number,
+      default: 15
+    },
+    maxContentLength: {
+      type: Number,
+      default: 2000
+    }
   }
 }, {
   timestamps: true
@@ -155,6 +237,70 @@ userSchema.methods.getPublicProfile = function() {
     joinedAt: this.joinedAt,
     lastActive: this.lastActive
   };
+};
+
+// Add method to get profile sections
+userSchema.methods.getProfileSections = function() {
+  const defaultSections = {
+    personality: {
+      id: 'personality',
+      title: 'Personality',
+      type: 'default',
+      content: this.personalityTraits.map((trait, index) => ({
+        id: `trait-${index}`,
+        title: trait.trait,
+        value: trait.strength,
+        contentType: 'progress'
+      }))
+    },
+    interests: {
+      id: 'interests',
+      title: 'Interests',
+      type: 'default',
+      content: this.interests.map((interest, index) => ({
+        id: `interest-${index}`,
+        title: interest,
+        contentType: 'text'
+      }))
+    },
+    languages: {
+      id: 'languages',
+      title: 'Languages',
+      type: 'default',
+      content: this.languages.map((lang, index) => ({
+        id: `lang-${index}`,
+        title: lang.name,
+        value: lang.proficiency,
+        contentType: 'text'
+      }))
+    },
+    achievements: {
+      id: 'achievements',
+      title: 'Achievements',
+      type: 'default',
+      content: this.achievements.map((achievement, index) => ({
+        id: `achievement-${index}`,
+        title: achievement.title,
+        description: achievement.description,
+        value: achievement.date,
+        contentType: 'date'
+      }))
+    }
+  };
+
+  // Combine default and custom sections, respecting visibility and order
+  const allSections = [
+    ...Object.entries(defaultSections)
+      .filter(([key]) => this.defaultSections[key]?.isVisible)
+      .map(([key, section]) => ({
+        ...section,
+        order: this.defaultSections[key].order
+      })),
+    ...this.profileSections
+      .filter(section => section.isVisible)
+  ].sort((a, b) => a.order - b.order);
+
+  return allSections;
 };
 
 const User = mongoose.model('User', userSchema);

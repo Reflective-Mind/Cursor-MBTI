@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 // Get current user's profile
 router.get('/me', auth, async (req, res) => {
@@ -237,6 +238,229 @@ router.get('/status/online', auth, async (req, res) => {
       stack: error.stack
     });
     res.status(500).json({ message: 'Error getting online users' });
+  }
+});
+
+// Add new section
+router.post('/:userId/sections', auth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check section limits
+    const totalSections = user.profileSections.length + 
+      Object.values(user.defaultSections).filter(s => s.isVisible).length;
+    
+    if (totalSections >= user.sectionLimits.maxMainSections) {
+      return res.status(400).json({ 
+        message: `Cannot add more than ${user.sectionLimits.maxMainSections} sections` 
+      });
+    }
+
+    const newSection = {
+      id: new mongoose.Types.ObjectId().toString(),
+      title: req.body.title || 'New Section',
+      order: totalSections,
+      isVisible: true,
+      type: 'custom',
+      content: []
+    };
+
+    user.profileSections.push(newSection);
+    await user.save();
+
+    res.json(newSection);
+  } catch (error) {
+    console.error('Error adding section:', error);
+    res.status(500).json({ message: 'Error adding section', details: error.message });
+  }
+});
+
+// Update section
+router.patch('/:userId/sections/:sectionId', auth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { title, order, isVisible } = req.body;
+
+    // Handle default sections
+    if (req.body.type === 'default') {
+      const sectionKey = req.params.sectionId;
+      if (user.defaultSections[sectionKey]) {
+        if (typeof isVisible === 'boolean') {
+          user.defaultSections[sectionKey].isVisible = isVisible;
+        }
+        if (typeof order === 'number') {
+          user.defaultSections[sectionKey].order = order;
+        }
+      }
+    } else {
+      // Handle custom sections
+      const sectionIndex = user.profileSections.findIndex(s => s.id === req.params.sectionId);
+      if (sectionIndex === -1) {
+        return res.status(404).json({ message: 'Section not found' });
+      }
+
+      if (title) user.profileSections[sectionIndex].title = title;
+      if (typeof order === 'number') user.profileSections[sectionIndex].order = order;
+      if (typeof isVisible === 'boolean') user.profileSections[sectionIndex].isVisible = isVisible;
+    }
+
+    await user.save();
+    res.json(user.getProfileSections());
+  } catch (error) {
+    console.error('Error updating section:', error);
+    res.status(500).json({ message: 'Error updating section', details: error.message });
+  }
+});
+
+// Delete section
+router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Cannot delete default sections
+    const section = user.profileSections.find(s => s.id === req.params.sectionId);
+    if (!section || section.type === 'default') {
+      return res.status(400).json({ message: 'Cannot delete this section' });
+    }
+
+    user.profileSections = user.profileSections.filter(s => s.id !== req.params.sectionId);
+    await user.save();
+
+    res.json({ message: 'Section deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting section:', error);
+    res.status(500).json({ message: 'Error deleting section', details: error.message });
+  }
+});
+
+// Add content to section
+router.post('/:userId/sections/:sectionId/content', auth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const section = user.profileSections.find(s => s.id === req.params.sectionId);
+    if (!section) {
+      return res.status(404).json({ message: 'Section not found' });
+    }
+
+    // Check content limits
+    if (section.content.length >= user.sectionLimits.maxSubSections) {
+      return res.status(400).json({ 
+        message: `Cannot add more than ${user.sectionLimits.maxSubSections} items to a section` 
+      });
+    }
+
+    const newContent = {
+      id: new mongoose.Types.ObjectId().toString(),
+      title: req.body.title || 'New Item',
+      order: section.content.length,
+      description: req.body.description || '',
+      value: req.body.value,
+      contentType: req.body.contentType || 'text'
+    };
+
+    section.content.push(newContent);
+    await user.save();
+
+    res.json(newContent);
+  } catch (error) {
+    console.error('Error adding content:', error);
+    res.status(500).json({ message: 'Error adding content', details: error.message });
+  }
+});
+
+// Update content
+router.patch('/:userId/sections/:sectionId/content/:contentId', auth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const section = user.profileSections.find(s => s.id === req.params.sectionId);
+    if (!section) {
+      return res.status(404).json({ message: 'Section not found' });
+    }
+
+    const contentIndex = section.content.findIndex(c => c.id === req.params.contentId);
+    if (contentIndex === -1) {
+      return res.status(404).json({ message: 'Content not found' });
+    }
+
+    const { title, description, value, order, contentType } = req.body;
+    const content = section.content[contentIndex];
+
+    if (title) content.title = title;
+    if (description) content.description = description;
+    if (value !== undefined) content.value = value;
+    if (typeof order === 'number') content.order = order;
+    if (contentType) content.contentType = contentType;
+
+    await user.save();
+    res.json(content);
+  } catch (error) {
+    console.error('Error updating content:', error);
+    res.status(500).json({ message: 'Error updating content', details: error.message });
+  }
+});
+
+// Delete content
+router.delete('/:userId/sections/:sectionId/content/:contentId', auth, async (req, res) => {
+  try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const section = user.profileSections.find(s => s.id === req.params.sectionId);
+    if (!section) {
+      return res.status(404).json({ message: 'Section not found' });
+    }
+
+    section.content = section.content.filter(c => c.id !== req.params.contentId);
+    await user.save();
+
+    res.json({ message: 'Content deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting content:', error);
+    res.status(500).json({ message: 'Error deleting content', details: error.message });
   }
 });
 
