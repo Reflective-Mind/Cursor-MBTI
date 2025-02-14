@@ -86,6 +86,7 @@ const Profile = () => {
     content: '',
     url: ''
   });
+  const [expandedContent, setExpandedContent] = useState(null);
 
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
@@ -297,17 +298,17 @@ const Profile = () => {
         return;
       }
 
-      if (!newContent.content.trim()) {
-        setError('Content is required');
+      if (!newContent.title.trim() || !newContent.content.trim()) {
+        setError('Both title and content are required');
         return;
       }
 
       console.log('Sending content:', {
+        title: newContent.title,
         content: newContent.content,
         section: selectedSection
       });
 
-      // Use profile._id for API calls
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
         method: 'POST',
         headers: {
@@ -315,6 +316,7 @@ const Profile = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          title: newContent.title,
           description: newContent.content,
           contentType: 'text'
         })
@@ -328,7 +330,6 @@ const Profile = () => {
       const newContentData = await response.json();
       console.log('Server response:', newContentData);
       
-      // Update the profile state with the new content
       setProfile(prev => {
         const updatedProfile = {
           ...prev,
@@ -338,7 +339,8 @@ const Profile = () => {
                   ...section, 
                   content: [...(section.content || []), {
                     ...newContentData,
-                    description: newContent.content // Ensure the content is set in the description field
+                    title: newContent.title,
+                    description: newContent.content
                   }]
                 }
               : section
@@ -349,11 +351,10 @@ const Profile = () => {
       });
       
       setContentDialog(false);
-      setNewContent({ type: 'text', content: '' });
+      setNewContent({ type: 'text', title: '', content: '' });
       setSelectedSection(null);
       setError(null);
 
-      // Refresh profile data to ensure we have the latest state
       await fetchProfile();
     } catch (error) {
       console.error('Error adding content:', error);
@@ -401,43 +402,81 @@ const Profile = () => {
 
   const renderSectionContent = (item, section) => {
     console.log('Rendering content item:', item);
+    const isContentExpanded = expandedContent === item.id;
+
     return (
-      <Box
+      <Accordion
         key={item.id}
+        expanded={isContentExpanded}
+        onChange={() => setExpandedContent(isContentExpanded ? null : item.id)}
         sx={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          py: 1.5,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          '&:last-child': {
-            borderBottom: 'none'
+          backgroundColor: 'background.default',
+          '&:before': {
+            display: 'none',
+          },
+          boxShadow: 1,
+          '& .MuiAccordionSummary-root': {
+            minHeight: '48px',
+            '&.Mui-expanded': {
+              minHeight: '48px',
+            }
+          },
+          '& .MuiAccordionSummary-content': {
+            margin: '12px 0',
+            '&.Mui-expanded': {
+              margin: '12px 0'
+            }
           }
         }}
       >
-        <Typography 
-          variant="body1" 
-          sx={{ 
-            flex: 1,
-            color: 'text.primary',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word'
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={{
+            backgroundColor: 'background.paper',
+            borderBottom: isContentExpanded ? 1 : 0,
+            borderColor: 'divider',
           }}
         >
-          {item.description || item.value || item.content || ''}
-        </Typography>
-        {isOwnProfile && (
-          <IconButton
-            size="small"
-            onClick={(e) => handleDeleteContent(section.id, item.id, e)}
-            color="error"
-            sx={{ ml: 1 }}
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            pr: 2
+          }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+              {item.title}
+            </Typography>
+            {isOwnProfile && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteContent(section.id, item.id, e);
+                }}
+                color="error"
+                sx={{ 
+                  ml: 1,
+                  visibility: isContentExpanded ? 'visible' : 'hidden'
+                }}
+              >
+                <DeleteIcon />
+              </IconButton>
+            )}
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails sx={{ p: 2, backgroundColor: 'background.paper' }}>
+          <Typography 
+            variant="body1" 
+            sx={{ 
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}
           >
-            <DeleteIcon />
-          </IconButton>
-        )}
-      </Box>
+            {item.description || item.content || ''}
+          </Typography>
+        </AccordionDetails>
+      </Accordion>
     );
   };
 
@@ -625,6 +664,16 @@ const Profile = () => {
           <DialogContent>
             <TextField
               margin="dense"
+              label="Title"
+              fullWidth
+              value={newContent.title}
+              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+              error={!!error && error.includes('title')}
+              helperText={error && error.includes('title') ? error : ''}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              margin="dense"
               label="Content"
               fullWidth
               multiline
@@ -633,7 +682,6 @@ const Profile = () => {
               onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
               error={!!error && error.includes('content')}
               helperText={error && error.includes('content') ? error : ''}
-              sx={{ mt: 2 }}
             />
           </DialogContent>
           <DialogActions>
