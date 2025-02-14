@@ -18,27 +18,33 @@ const BottomNav = () => {
     return 0;
   };
 
+  const handleNavigation = (newValue) => {
+    switch (newValue) {
+      case 0:
+        navigate('/');
+        break;
+      case 1:
+        navigate('/community');
+        break;
+      case 2:
+        navigate('/chat');
+        break;
+      case 3:
+        if (user?._id) {
+          navigate(`/profile/${user._id}`);
+        } else {
+          navigate('/profile');
+        }
+        break;
+      default:
+        navigate('/');
+    }
+  };
+
   return (
     <BottomNavigation
       value={getActiveTab()}
-      onChange={(event, newValue) => {
-        switch (newValue) {
-          case 0:
-            navigate('/');
-            break;
-          case 1:
-            navigate('/community');
-            break;
-          case 2:
-            navigate('/chat');
-            break;
-          case 3:
-            navigate(`/profile/${user?._id}`);
-            break;
-          default:
-            navigate('/');
-        }
-      }}
+      onChange={(event, newValue) => handleNavigation(newValue)}
       sx={{
         width: '100%',
         position: 'fixed',
@@ -46,7 +52,8 @@ const BottomNav = () => {
         borderTop: 1,
         borderColor: 'divider',
         zIndex: 1000,
-        backgroundColor: 'background.paper'
+        backgroundColor: 'background.paper',
+        display: { xs: 'flex', md: 'none' }
       }}
     >
       <BottomNavigationAction label="Home" icon={<HomeIcon />} />
