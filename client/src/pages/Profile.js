@@ -114,18 +114,6 @@ const Profile = () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // If no userId in URL, use current user's ID
-        const targetId = userId || currentUser?._id;
-        
-        // Check if we have a valid ID to fetch
-        if (!targetId && !currentUser?._id) {
-          console.error('No user ID available:', { userId, currentUser });
-          setError('Authentication required');
-          setLoading(false);
-          navigate('/login', { state: { from: location.pathname } });
-          return;
-        }
 
         const token = localStorage.getItem('token');
         if (!token) {
@@ -134,8 +122,9 @@ const Profile = () => {
           return;
         }
 
-        // Use /api/users/me endpoint when viewing own profile
-        const endpoint = !userId ? 'me' : targetId;
+        // If we're on /profile (no userId), use the /me endpoint
+        // Otherwise, use the specific user endpoint
+        const endpoint = !userId ? 'me' : userId;
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -177,13 +166,9 @@ const Profile = () => {
 
     // Only fetch if we're done checking auth
     if (!authLoading) {
-      if (!currentUser && !userId) {
-        navigate('/login', { state: { from: location.pathname } });
-      } else {
-        fetchProfile();
-      }
+      fetchProfile();
     }
-  }, [userId, currentUser, authLoading, navigate, location.pathname]);
+  }, [userId, authLoading, navigate, location.pathname]);
 
   const handleEdit = () => {
     setIsEditing(true);
