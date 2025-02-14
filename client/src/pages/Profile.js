@@ -70,6 +70,8 @@ const Profile = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { userId } = useParams();
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -79,23 +81,15 @@ const Profile = () => {
     username: '',
     mbtiType: '',
     bio: '',
-    personalityTraits: [],
-    interests: [],
-    favoriteQuote: { text: '', author: '' },
+    location: { city: '', country: '' },
+    occupation: '',
+    education: '',
     socialLinks: {
       twitter: '',
       linkedin: '',
       github: '',
       website: ''
-    },
-    location: {
-      city: '',
-      country: ''
-    },
-    occupation: '',
-    education: '',
-    languages: [],
-    achievements: []
+    }
   });
   const [sections, setSections] = useState([]);
   const [editingSection, setEditingSection] = useState(null);
@@ -107,8 +101,6 @@ const Profile = () => {
   const [contentMenuAnchor, setContentMenuAnchor] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedContent, setSelectedContent] = useState(null);
-
-  const navigate = useNavigate();
 
   const mbtiTypes = [
     'INTJ', 'INTP', 'ENTJ', 'ENTP',
@@ -136,11 +128,8 @@ const Profile = () => {
         const response = await fetch(`${baseUrl}${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          mode: 'cors'
+            'Accept': 'application/json'
+          }
         });
 
         if (!response.ok) {
@@ -171,20 +160,15 @@ const Profile = () => {
       username: userData.username || '',
       mbtiType: userData.mbtiType || '',
       bio: userData.bio || '',
-      personalityTraits: userData.personalityTraits || [],
-      interests: userData.interests || [],
-      favoriteQuote: userData.favoriteQuote || { text: '', author: '' },
+      location: userData.location || { city: '', country: '' },
+      occupation: userData.occupation || '',
+      education: userData.education || '',
       socialLinks: userData.socialLinks || {
         twitter: '',
         linkedin: '',
         github: '',
         website: ''
-      },
-      location: userData.location || { city: '', country: '' },
-      occupation: userData.occupation || '',
-      education: userData.education || '',
-      languages: userData.languages || [],
-      achievements: userData.achievements || []
+      }
     });
   };
 
@@ -206,11 +190,8 @@ const Profile = () => {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
-        credentials: 'include',
-        mode: 'cors',
         body: JSON.stringify(editForm)
       });
 
@@ -961,129 +942,6 @@ const Profile = () => {
                   onChange={(e) => setEditForm(prev => ({
                     ...prev,
                     socialLinks: { ...prev.socialLinks, website: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-
-            <Divider />
-
-            <Typography variant="h6">
-              Languages
-              <IconButton size="small" onClick={handleAddLanguage} sx={{ ml: 1 }}>
-                <AddIcon />
-              </IconButton>
-            </Typography>
-            {editForm.languages.map((language, index) => (
-              <Grid container spacing={2} key={index}>
-                <Grid item xs={12} sm={5}>
-                  <TextField
-                    label="Language"
-                    value={language.name}
-                    onChange={(e) => {
-                      const newLanguages = [...editForm.languages];
-                      newLanguages[index].name = e.target.value;
-                      setEditForm(prev => ({ ...prev, languages: newLanguages }));
-                    }}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12} sm={5}>
-                  <TextField
-                    select
-                    label="Proficiency"
-                    value={language.proficiency}
-                    onChange={(e) => {
-                      const newLanguages = [...editForm.languages];
-                      newLanguages[index].proficiency = e.target.value;
-                      setEditForm(prev => ({ ...prev, languages: newLanguages }));
-                    }}
-                    fullWidth
-                    SelectProps={{
-                      native: true
-                    }}
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                    <option value="native">Native</option>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12} sm={2}>
-                  <IconButton onClick={() => handleRemoveLanguage(index)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Grid>
-              </Grid>
-            ))}
-
-            <Divider />
-
-            <Typography variant="h6">
-              Achievements
-              <IconButton size="small" onClick={handleAddAchievement} sx={{ ml: 1 }}>
-                <AddIcon />
-              </IconButton>
-            </Typography>
-            {editForm.achievements.map((achievement, index) => (
-              <Grid container spacing={2} key={index}>
-                <Grid item xs={12} sm={5}>
-                  <TextField
-                    label="Title"
-                    value={achievement.title}
-                    onChange={(e) => {
-                      const newAchievements = [...editForm.achievements];
-                      newAchievements[index].title = e.target.value;
-                      setEditForm(prev => ({ ...prev, achievements: newAchievements }));
-                    }}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12} sm={5}>
-                  <TextField
-                    label="Description"
-                    value={achievement.description}
-                    onChange={(e) => {
-                      const newAchievements = [...editForm.achievements];
-                      newAchievements[index].description = e.target.value;
-                      setEditForm(prev => ({ ...prev, achievements: newAchievements }));
-                    }}
-                    fullWidth
-                    multiline
-                  />
-                </Grid>
-                <Grid item xs={12} sm={2}>
-                  <IconButton onClick={() => handleRemoveAchievement(index)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Grid>
-              </Grid>
-            ))}
-
-            <Divider />
-
-            <Typography variant="h6">Favorite Quote</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={8}>
-                <TextField
-                  label="Quote"
-                  value={editForm.favoriteQuote.text}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    favoriteQuote: { ...prev.favoriteQuote, text: e.target.value }
-                  }))}
-                  fullWidth
-                  multiline
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  label="Author"
-                  value={editForm.favoriteQuote.author}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    favoriteQuote: { ...prev.favoriteQuote, author: e.target.value }
                   }))}
                   fullWidth
                 />
