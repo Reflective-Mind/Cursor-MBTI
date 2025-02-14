@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const mongoose = require('mongoose');
+const TestResult = require('../models/TestResult');
 
 // Get current user's profile
 router.get('/me', auth, async (req, res) => {
@@ -461,6 +462,107 @@ router.delete('/:userId/sections/:sectionId/content/:contentId', auth, async (re
   } catch (error) {
     console.error('Error deleting content:', error);
     res.status(500).json({ message: 'Error deleting content', details: error.message });
+  }
+});
+
+// Store test results
+router.post('/me/test-results', auth, async (req, res) => {
+  try {
+    // Map test type to category
+    const testTypeMapping = {
+      'mbti-8': 'mbti-8',
+      'mbti-24': 'mbti-24',
+      'mbti-100': 'mbti-100'
+    };
+
+    const testCategory = testTypeMapping[req.body.testType];
+    if (!testCategory) {
+      return res.status(400).json({ message: 'Invalid test type' });
+    }
+
+    // Check if a result for this test category already exists
+    const existingResult = await TestResult.findOne({
+      user: req.user._id,
+      testCategory
+    });
+
+    if (existingResult) {
+      // Update existing result
+      existingResult.result = req.body.result;
+      existingResult.answers = req.body.answers.map(answer => ({
+        ...answer,
+        question: req.body.questions.find(q => q.id === answer.questionId)?.text,
+        category: req.body.questions.find(q => q.id === answer.questionId)?.category
+      }));
+      existingResult.analysisVersion += 1;
+      await existingResult.save();
+      
+      // Update user's MBTI type if this is the most comprehensive test
+      if (testCategory === 'mbti-100' || 
+         (testCategory === 'mbti-24' && !await TestResult.findOne({ user: req.user._id, testCategory: 'mbti-100' })) ||
+         (testCategory === 'mbti-8' && !await TestResult.findOne({ user: req.user._id, testCategory: { $in: ['mbti-24', 'mbti-100'] } }))) {
+        await User.findByIdAndUpdate(req.user._id, {
+          mbtiType: req.body.result.type
+        });
+      }
+      
+      return res.status(200).json(existingResult);
+    } else {
+      // Create new result
+      const testResult = new TestResult({
+        user: req.user._id,
+        testCategory,
+        result: req.body.result,
+        answers: req.body.answers.map(answer => ({
+          ...answer,
+          question: req.body.questions.find(q => q.id === answer.questionId)?.text,
+          category: req.body.questions.find(q => q.id === answer.questionId)?.category
+        }))
+      });
+
+      await testResult.save();
+
+      // Update user's MBTI type following the same logic
+      if (testCategory === 'mbti-100' || 
+         (testCategory === 'mbti-24' && !await TestResult.findOne({ user: req.user._id, testCategory: 'mbti-100' })) ||
+         (testCategory === 'mbti-8' && !await TestResult.findOne({ user: req.user._id, testCategory: { $in: ['mbti-24', 'mbti-100'] } }))) {
+        await User.findByIdAndUpdate(req.user._id, {
+          mbtiType: req.body.result.type
+        });
+      }
+
+      return res.status(201).json(testResult);
+    }
+  } catch (error) {
+    console.error('Error storing test results:', error);
+    res.status(500).json({ message: 'Error storing test results' });
+  }
+});
+
+// Get user profile
+router.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update user profile
+router.put('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: req.body },
+      { new: true }
+    ).select('-password');
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 

@@ -13,11 +13,16 @@ const openai = new OpenAI({
 router.post('/users/me/test-results', auth, async (req, res) => {
   try {
     // Map test type to category
-    const testCategory = {
-      'basic': 'mbti-8',
-      'standard': 'mbti-24',
-      'expert': 'mbti-100'
-    }[req.body.testType];
+    const testTypeMapping = {
+      'mbti-8': 'mbti-8',
+      'mbti-24': 'mbti-24',
+      'mbti-100': 'mbti-100'
+    };
+
+    const testCategory = testTypeMapping[req.body.testType];
+    if (!testCategory) {
+      return res.status(400).json({ message: 'Invalid test type' });
+    }
 
     // Check if a result for this test category already exists
     const existingResult = await TestResult.findOne({
@@ -45,7 +50,7 @@ router.post('/users/me/test-results', auth, async (req, res) => {
         });
       }
       
-      res.status(200).json(existingResult);
+      return res.status(200).json(existingResult);
     } else {
       // Create new result
       const testResult = new TestResult({
@@ -70,7 +75,7 @@ router.post('/users/me/test-results', auth, async (req, res) => {
         });
       }
 
-      res.status(201).json(testResult);
+      return res.status(201).json(testResult);
     }
   } catch (error) {
     console.error('Error storing test results:', error);

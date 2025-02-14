@@ -440,13 +440,13 @@ app.get('/', (req, res) => {
   });
 });
 
+// API routes
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/users', require('./routes/users'));
 app.use('/api/personality', require('./routes/personality'));
 app.use('/api/insights', require('./routes/insights'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/community', require('./routes/community'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api', require('./routes/testResults'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
