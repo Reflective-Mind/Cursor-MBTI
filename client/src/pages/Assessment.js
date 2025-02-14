@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 // Basic questions (original 8 questions)
 const basicQuestions = [
@@ -1378,6 +1379,7 @@ const testTypes = [
 
 const Assessment = () => {
   const navigate = useNavigate();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const [activeStep, setActiveStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [isComplete, setIsComplete] = useState(false);
@@ -1391,6 +1393,13 @@ const Assessment = () => {
   const [error, setError] = useState(null);
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState('');
+
+  // Check authentication
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      navigate('/login', { state: { from: '/assessment' } });
+    }
+  }, [currentUser, authLoading, navigate]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1481,15 +1490,58 @@ const Assessment = () => {
     return detailedResult;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (activeStep === questions.length - 1) {
       const result = calculatePersonalityType();
       console.log('Calculated personality result:', result);
       setPersonalityType(result.type);
-      localStorage.setItem('mbtiType', result.type);
-      localStorage.setItem('mbtiDetails', JSON.stringify(result));
-      console.log('Saved assessment details to localStorage');
-      setIsComplete(true);
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
+
+        // Prepare questions data
+        const allQuestions = questions.reduce((acc, category) => {
+          return acc.concat(category.questions.map(q => ({
+            id: q.id,
+            text: q.text,
+            category: category.category
+          })));
+        }, []);
+
+        // Store test results
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me/test-results`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            testType: selectedTest.id,
+            result: result,
+            answers: Object.entries(answers).map(([questionId, value]) => ({
+              questionId,
+              answer: value
+            })),
+            questions: allQuestions
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to store test results');
+        }
+
+        localStorage.setItem('mbtiType', result.type);
+        localStorage.setItem('mbtiDetails', JSON.stringify(result));
+        console.log('Saved assessment details to localStorage and server');
+        setIsComplete(true);
+      } catch (error) {
+        console.error('Error storing test results:', error);
+        setError('Failed to store test results. Please try again.');
+      }
     } else {
       setActiveStep((prev) => prev + 1);
     }
@@ -1742,6 +1794,14 @@ Keep responses concise (2-4 sentences) and use simple language.`
       </Box>
     </Drawer>
   );
+
+  if (authLoading) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
   if (!selectedTest) {
     return (

@@ -446,6 +446,7 @@ app.use('/api/insights', require('./routes/insights'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/community', require('./routes/community'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api', require('./routes/testResults'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

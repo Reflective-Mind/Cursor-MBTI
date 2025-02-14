@@ -48,6 +48,7 @@ import {
   LinkedIn as LinkedInIcon,
   GitHub as GitHubIcon,
   Language as WebsiteIcon,
+  Psychology as PsychologyIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -87,6 +88,7 @@ const Profile = () => {
     url: ''
   });
   const [expandedContent, setExpandedContent] = useState(null);
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
 
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
@@ -400,6 +402,65 @@ const Profile = () => {
     }
   };
 
+  const handleGenerateAIStory = async () => {
+    try {
+      setIsGeneratingStory(true);
+      setError(null);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      // Fetch test results and generate story
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/generate-story`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate AI story');
+      }
+
+      const data = await response.json();
+      
+      // Create a new section with the AI story
+      const storyResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: 'AI Personality Analysis',
+          type: 'ai_analysis',
+          content: [{
+            title: 'Your Personality Story',
+            description: data.story,
+            contentType: 'text'
+          }]
+        })
+      });
+
+      if (!storyResponse.ok) {
+        throw new Error('Failed to save AI story');
+      }
+
+      // Refresh profile to show new section
+      await fetchProfile();
+      setError(null);
+    } catch (error) {
+      console.error('Error generating AI story:', error);
+      setError(error.message);
+    } finally {
+      setIsGeneratingStory(false);
+    }
+  };
+
   const renderSectionContent = (item, section) => {
     console.log('Rendering content item:', item);
     const isContentExpanded = expandedContent === item.id;
@@ -514,17 +575,29 @@ const Profile = () => {
               <Chip label={profile?.mbtiType} color="primary" />
             </Box>
           </Box>
-          {isOwnProfile && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleAddSection}
-              disabled={profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10)}
-              title={profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10) ? 'Maximum number of sections reached' : 'Add new section'}
-            >
-              Add Section
-            </Button>
-          )}
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {isOwnProfile && (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<PsychologyIcon />}
+                  onClick={handleGenerateAIStory}
+                  disabled={isGeneratingStory}
+                >
+                  {isGeneratingStory ? 'Generating Story...' : 'Generate AI Story'}
+                </Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddSection}
+                  disabled={profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10)}
+                  title={profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10) ? 'Maximum number of sections reached' : 'Add new section'}
+                >
+                  Add Section
+                </Button>
+              </>
+            )}
+          </Box>
         </Box>
 
         {error && (
