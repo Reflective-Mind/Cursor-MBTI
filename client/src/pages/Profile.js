@@ -137,14 +137,13 @@ const Profile = () => {
         
         // If we still don't have a targetUserId, try to fetch current user's profile
         if (!targetUserId) {
-          console.log('Test 8 - No target user ID, fetching current user profile');
+          console.log('No target user ID, fetching current user profile');
           const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
           const response = await fetch(`${baseUrl}/api/users/me`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Accept': 'application/json'
-            },
-            credentials: 'include'
+            }
           });
 
           if (!response.ok) {
@@ -158,56 +157,23 @@ const Profile = () => {
 
           const data = await response.json();
           setUser(data);
-          setEditForm({
-            username: data.username || '',
-            mbtiType: data.mbtiType || '',
-            bio: data.bio || '',
-            personalityTraits: data.personalityTraits || [],
-            interests: data.interests || [],
-            favoriteQuote: data.favoriteQuote || { text: '', author: '' },
-            socialLinks: data.socialLinks || {
-              twitter: '',
-              linkedin: '',
-              github: '',
-              website: ''
-            },
-            location: data.location || { city: '', country: '' },
-            occupation: data.occupation || '',
-            education: data.education || '',
-            languages: data.languages || [],
-            achievements: data.achievements || []
-          });
+          initializeEditForm(data);
           setLoading(false);
           return;
         }
-
-        console.log('Test 8 - Fetching profile:', {
-          targetUserId,
-          currentUser: currentUser?._id,
-          isOwnProfile: targetUserId === currentUser?._id
-        });
 
         const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
         const response = await fetch(`${baseUrl}/api/users/${targetUserId}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
-          },
-          credentials: 'include'
-        });
-
-        console.log('Test 8 - Profile API response:', {
-          status: response.status,
-          ok: response.ok
+          }
         });
 
         if (!response.ok) {
           if (response.status === 401) {
             localStorage.removeItem('token');
-            navigate('/login', { 
-              state: { from: `/profile/${userId || ''}` },
-              replace: true 
-            });
+            navigate('/login');
             return;
           }
           const errorData = await response.json();
@@ -215,38 +181,11 @@ const Profile = () => {
         }
 
         const data = await response.json();
-        console.log('Test 8 - Profile data:', {
-          username: data.username,
-          mbtiType: data.mbtiType,
-          isCurrentUser: data._id === currentUser?._id
-        });
-
         setUser(data);
-        setEditForm({
-          username: data.username || '',
-          mbtiType: data.mbtiType || '',
-          bio: data.bio || '',
-          personalityTraits: data.personalityTraits || [],
-          interests: data.interests || [],
-          favoriteQuote: data.favoriteQuote || { text: '', author: '' },
-          socialLinks: data.socialLinks || {
-            twitter: '',
-            linkedin: '',
-            github: '',
-            website: ''
-          },
-          location: data.location || { city: '', country: '' },
-          occupation: data.occupation || '',
-          education: data.education || '',
-          languages: data.languages || [],
-          achievements: data.achievements || []
-        });
+        initializeEditForm(data);
       } catch (err) {
-        console.error('Test 8 - Profile loading error:', {
-          message: err.message,
-          stack: err.stack
-        });
-        setError(err.message);
+        console.error('Profile loading error:', err);
+        setError(err.message || 'Failed to load profile');
       } finally {
         setLoading(false);
       }
@@ -254,6 +193,29 @@ const Profile = () => {
 
     fetchProfile();
   }, [userId, currentUser, navigate]);
+
+  // Add this helper function to initialize the edit form
+  const initializeEditForm = (userData) => {
+    setEditForm({
+      username: userData.username || '',
+      mbtiType: userData.mbtiType || '',
+      bio: userData.bio || '',
+      personalityTraits: userData.personalityTraits || [],
+      interests: userData.interests || [],
+      favoriteQuote: userData.favoriteQuote || { text: '', author: '' },
+      socialLinks: userData.socialLinks || {
+        twitter: '',
+        linkedin: '',
+        github: '',
+        website: ''
+      },
+      location: userData.location || { city: '', country: '' },
+      occupation: userData.occupation || '',
+      education: userData.education || '',
+      languages: userData.languages || [],
+      achievements: userData.achievements || []
+    });
+  };
 
   const handleEditSubmit = async () => {
     try {
@@ -263,8 +225,16 @@ const Profile = () => {
         return;
       }
 
+      setError(null);
+      
+      // Get the user ID to update
+      const targetUserId = userId || currentUser?._id;
+      if (!targetUserId) {
+        throw new Error('No user ID available for update');
+      }
+
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${user._id}`, {
+      const response = await fetch(`${baseUrl}/api/users/${targetUserId}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -296,12 +266,15 @@ const Profile = () => {
       setIsEditing(false);
 
       // Update local storage if needed
-      if (user._id === currentUser?._id) {
+      if (targetUserId === currentUser?._id) {
         localStorage.setItem('mbtiType', updatedUser.mbtiType);
       }
+
+      // Show success message or update UI
+      console.log('Profile updated successfully');
     } catch (err) {
       console.error('Profile update error:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to update profile');
     }
   };
 

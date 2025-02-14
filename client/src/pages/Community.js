@@ -652,7 +652,7 @@ const Community = () => {
                         >
                           <Avatar 
                             src={msg.author.avatar}
-                            onClick={() => handleProfileClick(msg.author.id)}
+                            onClick={() => handleProfileClick(msg.author._id)}
                             sx={{ cursor: 'pointer' }}
                           >
                             {msg.author.username[0]}
