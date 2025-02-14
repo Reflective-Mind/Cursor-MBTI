@@ -89,58 +89,59 @@ const Profile = () => {
 
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
+  // Move fetchProfile outside useEffect
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required');
+        navigate('/login', { state: { from: location.pathname } });
+        return;
+      }
+
+      const endpoint = !userId ? 'me' : userId;
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${endpoint}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.status === 401) {
+        localStorage.removeItem('token');
+        setError('Authentication required');
+        navigate('/login', { state: { from: location.pathname } });
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      setProfile(data);
+      setEditForm({
+        username: data.username || '',
+        mbtiType: data.mbtiType || '',
+        sections: data.sections || []
+      });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch profile data
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setError('Authentication required');
-          navigate('/login', { state: { from: location.pathname } });
-          return;
-        }
-
-        const endpoint = !userId ? 'me' : userId;
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${endpoint}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
-        });
-
-        if (!response.status === 401) {
-          localStorage.removeItem('token');
-          setError('Authentication required');
-          navigate('/login', { state: { from: location.pathname } });
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-
-        const data = await response.json();
-        setProfile(data);
-        setEditForm({
-          username: data.username || '',
-          mbtiType: data.mbtiType || '',
-          sections: data.sections || []
-        });
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (!authLoading) {
       fetchProfile();
     }
-  }, [userId, authLoading, navigate, location.pathname]);
+  }, [userId, authLoading]);
 
   const handleSectionExpand = (sectionId) => {
     setExpandedSection(expandedSection === sectionId ? null : sectionId);
