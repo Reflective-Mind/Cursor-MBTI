@@ -574,6 +574,10 @@ const Community = () => {
   };
 
   const handleProfileClick = (userId) => {
+    // Check if userId exists and is valid
+    if (!userId) return;
+    
+    // Navigate to the profile page with the userId
     navigate(`/profile/${userId}`);
   };
 

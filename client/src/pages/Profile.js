@@ -269,10 +269,21 @@ const Profile = () => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        credentials: 'include',
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({
+          username: editForm.username,
+          mbtiType: editForm.mbtiType,
+          bio: editForm.bio,
+          personalityTraits: editForm.personalityTraits,
+          interests: editForm.interests,
+          favoriteQuote: editForm.favoriteQuote,
+          socialLinks: editForm.socialLinks,
+          location: editForm.location,
+          occupation: editForm.occupation,
+          education: editForm.education,
+          languages: editForm.languages,
+          achievements: editForm.achievements
+        })
       });
 
       if (!response.ok) {
@@ -284,14 +295,12 @@ const Profile = () => {
       setUser(updatedUser);
       setIsEditing(false);
 
+      // Update local storage if needed
       if (user._id === currentUser?._id) {
         localStorage.setItem('mbtiType', updatedUser.mbtiType);
       }
     } catch (err) {
-      console.error('Test 6 - Profile update error:', {
-        message: err.message,
-        stack: err.stack
-      });
+      console.error('Profile update error:', err);
       setError(err.message);
     }
   };

@@ -1,74 +1,59 @@
 import React from 'react';
+import { BottomNavigation, BottomNavigationAction } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  Paper,
-  BottomNavigation,
-  BottomNavigationAction,
-  useTheme,
-  useMediaQuery,
-} from '@mui/material';
-import {
-  Home as HomeIcon,
-  Psychology as AssessmentIcon,
-  Insights as InsightsIcon,
-  Chat as ChatIcon,
-  Group as CommunityIcon,
-} from '@mui/icons-material';
+import { Home as HomeIcon, Group as GroupIcon, Person as ProfileIcon, Chat as ChatIcon } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
 const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user } = useAuth();
 
-  if (!isMobile) return null;
+  const getActiveTab = () => {
+    const path = location.pathname;
+    if (path === '/') return 0;
+    if (path === '/community') return 1;
+    if (path.startsWith('/chat')) return 2;
+    if (path.startsWith('/profile')) return 3;
+    return 0;
+  };
 
   return (
-    <Paper
+    <BottomNavigation
+      value={getActiveTab()}
+      onChange={(event, newValue) => {
+        switch (newValue) {
+          case 0:
+            navigate('/');
+            break;
+          case 1:
+            navigate('/community');
+            break;
+          case 2:
+            navigate('/chat');
+            break;
+          case 3:
+            navigate(`/profile/${user?._id}`);
+            break;
+          default:
+            navigate('/');
+        }
+      }}
       sx={{
+        width: '100%',
         position: 'fixed',
         bottom: 0,
-        left: 0,
-        right: 0,
+        borderTop: 1,
+        borderColor: 'divider',
         zIndex: 1000,
-        borderRadius: 0,
+        backgroundColor: 'background.paper'
       }}
-      elevation={3}
     >
-      <BottomNavigation
-        value={location.pathname}
-        onChange={(event, newValue) => {
-          navigate(newValue);
-        }}
-        showLabels
-      >
-        <BottomNavigationAction
-          label="Home"
-          value="/"
-          icon={<HomeIcon />}
-        />
-        <BottomNavigationAction
-          label="Test"
-          value="/assessment"
-          icon={<AssessmentIcon />}
-        />
-        <BottomNavigationAction
-          label="Insights"
-          value="/insights"
-          icon={<InsightsIcon />}
-        />
-        <BottomNavigationAction
-          label="AI Chat"
-          value="/chat"
-          icon={<ChatIcon />}
-        />
-        <BottomNavigationAction
-          label="Community"
-          value="/community"
-          icon={<CommunityIcon />}
-        />
-      </BottomNavigation>
-    </Paper>
+      <BottomNavigationAction label="Home" icon={<HomeIcon />} />
+      <BottomNavigationAction label="Community" icon={<GroupIcon />} />
+      <BottomNavigationAction label="Chat" icon={<ChatIcon />} />
+      <BottomNavigationAction label="Profile" icon={<ProfileIcon />} />
+    </BottomNavigation>
   );
 };
 
