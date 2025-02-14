@@ -136,8 +136,11 @@ const Profile = () => {
         const response = await fetch(`${baseUrl}${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          mode: 'cors'
         });
 
         if (!response.ok) {
@@ -204,12 +207,16 @@ const Profile = () => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',
+        mode: 'cors',
         body: JSON.stringify(editForm)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
       }
 
       const updatedUser = await response.json();

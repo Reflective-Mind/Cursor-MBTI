@@ -45,15 +45,6 @@ const corsOptions = {
       'http://localhost:3000',
       'https://mbti-render.onrender.com'
     ];
-    console.log('Test 8 - CORS origin check:', { 
-      origin, 
-      allowed: !origin || allowedOrigins.includes(origin),
-      env: process.env.NODE_ENV,
-      headers: {
-        'content-type': 'application/json',
-        'accept': 'application/json'
-      }
-    });
 
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
@@ -70,7 +61,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'Content-Type', 'Access-Control-Allow-Origin', 'Access-Control-Allow-Credentials'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
   preflightContinue: false,
   optionsSuccessStatus: 204,
   maxAge: 86400
@@ -86,35 +77,15 @@ app.options('*', cors(corsOptions));
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
-  // Log the request details for debugging
-  console.log('Test 8 - Request details:', {
-    method: req.method,
-    url: req.url,
-    origin: origin,
-    path: req.path,
-    headers: {
-      'content-type': req.headers['content-type'],
-      'accept': req.headers.accept,
-      'authorization': req.headers.authorization ? 'Present' : 'Missing'
-    },
-    env: process.env.NODE_ENV
-  });
-
   if (origin) {
-    corsOptions.origin(origin, (err, allowed) => {
-      if (allowed) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
-        res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
-        res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
-        res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
-      }
-      next();
-    });
-  } else {
-    next();
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
+    res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
+    res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
+    res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
   }
+  next();
 });
 
 // Socket.IO configuration
