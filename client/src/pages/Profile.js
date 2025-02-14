@@ -539,6 +539,260 @@ const Profile = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Paper sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar
+              src={user.avatar}
+              sx={{ width: 100, height: 100 }}
+            >
+              {user.username?.[0]}
+            </Avatar>
+            <Box>
+              <Typography variant="h4">{user.username}</Typography>
+              <Typography variant="h6" color="text.secondary">{user.mbtiType}</Typography>
+            </Box>
+          </Box>
+          {user._id === currentUser?._id && (
+            <Button
+              variant="contained"
+              startIcon={isEditing ? <SaveIcon /> : <EditIcon />}
+              onClick={() => isEditing ? handleEditSubmit() : setIsEditing(true)}
+            >
+              {isEditing ? 'Save Changes' : 'Edit Profile'}
+            </Button>
+          )}
+        </Box>
+
+        {isEditing && user._id === currentUser?._id ? (
+          <Box component="form" sx={{ mt: 3 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Username"
+                  value={editForm.username}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  select
+                  label="MBTI Type"
+                  value={editForm.mbtiType}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, mbtiType: e.target.value }))}
+                >
+                  {mbtiTypes.map((type) => (
+                    <MenuItem key={type} value={type}>
+                      {type}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Bio"
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="City"
+                  value={editForm.location.city}
+                  onChange={(e) => setEditForm(prev => ({
+                    ...prev,
+                    location: { ...prev.location, city: e.target.value }
+                  }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Country"
+                  value={editForm.location.country}
+                  onChange={(e) => setEditForm(prev => ({
+                    ...prev,
+                    location: { ...prev.location, country: e.target.value }
+                  }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Occupation"
+                  value={editForm.occupation}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, occupation: e.target.value }))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Education"
+                  value={editForm.education}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, education: e.target.value }))}
+                />
+              </Grid>
+            </Grid>
+
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" gutterBottom>Social Links</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Twitter"
+                    value={editForm.socialLinks.twitter}
+                    onChange={(e) => setEditForm(prev => ({
+                      ...prev,
+                      socialLinks: { ...prev.socialLinks, twitter: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="LinkedIn"
+                    value={editForm.socialLinks.linkedin}
+                    onChange={(e) => setEditForm(prev => ({
+                      ...prev,
+                      socialLinks: { ...prev.socialLinks, linkedin: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="GitHub"
+                    value={editForm.socialLinks.github}
+                    onChange={(e) => setEditForm(prev => ({
+                      ...prev,
+                      socialLinks: { ...prev.socialLinks, github: e.target.value }
+                    }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Website"
+                    value={editForm.socialLinks.website}
+                    onChange={(e) => setEditForm(prev => ({
+                      ...prev,
+                      socialLinks: { ...prev.socialLinks, website: e.target.value }
+                    }))}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleEditSubmit}
+              >
+                Save Changes
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setIsEditing(false);
+                  initializeEditForm(user);
+                }}
+              >
+                Cancel
+              </Button>
+            </Box>
+          </Box>
+        ) : (
+          <>
+            <Typography variant="body1" sx={{ mt: 2, mb: 3 }}>{user.bio}</Typography>
+            
+            <Grid container spacing={3}>
+              {user.location?.city && user.location?.country && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <LocationIcon color="action" />
+                    <Typography>{`${user.location.city}, ${user.location.country}`}</Typography>
+                  </Box>
+                </Grid>
+              )}
+              
+              {user.occupation && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <WorkIcon color="action" />
+                    <Typography>{user.occupation}</Typography>
+                  </Box>
+                </Grid>
+              )}
+              
+              {user.education && (
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <SchoolIcon color="action" />
+                    <Typography>{user.education}</Typography>
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+
+            {Object.values(user.socialLinks || {}).some(link => link) && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="h6" gutterBottom>Social Links</Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  {user.socialLinks?.twitter && (
+                    <IconButton
+                      component={Link}
+                      href={user.socialLinks.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <TwitterIcon />
+                    </IconButton>
+                  )}
+                  {user.socialLinks?.linkedin && (
+                    <IconButton
+                      component={Link}
+                      href={user.socialLinks.linkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <LinkedInIcon />
+                    </IconButton>
+                  )}
+                  {user.socialLinks?.github && (
+                    <IconButton
+                      component={Link}
+                      href={user.socialLinks.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <GitHubIcon />
+                    </IconButton>
+                  )}
+                  {user.socialLinks?.website && (
+                    <IconButton
+                      component={Link}
+                      href={user.socialLinks.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <WebsiteIcon />
+                    </IconButton>
+                  )}
+                </Box>
+              </Box>
+            )}
+          </>
+        )}
+      </Paper>
+
       <Paper 
         elevation={3} 
         sx={{ 
@@ -547,126 +801,6 @@ const Profile = () => {
           background: `linear-gradient(to bottom, ${user.theme?.primaryColor || theme.palette.primary.main}22, transparent)`
         }}
       >
-        {/* Header Section */}
-        <Box 
-          sx={{ 
-            p: isMobile ? 2 : 4,
-            background: `linear-gradient(to right, ${user.theme?.primaryColor || theme.palette.primary.main}11, ${user.theme?.accentColor || theme.palette.secondary.main}11)`,
-          }}
-        >
-          <Grid container spacing={4} alignItems="center">
-            <Grid item xs={12} md={4} sx={{ textAlign: 'center' }}>
-              <Avatar
-                src={user.avatar}
-                sx={{
-                  width: isMobile ? 120 : 200,
-                  height: isMobile ? 120 : 200,
-                  margin: '0 auto',
-                  mb: 2,
-                  border: 4,
-                  borderColor: user.isOnline ? 'success.main' : 'grey.300',
-                  boxShadow: theme.shadows[8]
-                }}
-              >
-                {user.username?.[0]}
-              </Avatar>
-              <Chip
-                label={user.isOnline ? 'Online' : 'Offline'}
-                color={user.isOnline ? 'success' : 'default'}
-                sx={{ mb: 2 }}
-              />
-              {isOwnProfile && (
-                <Button
-                  variant="contained"
-                  startIcon={<EditIcon />}
-                  onClick={() => setIsEditing(true)}
-                  sx={{ mt: 2 }}
-                >
-                  Edit Profile
-                </Button>
-              )}
-            </Grid>
-            <Grid item xs={12} md={8}>
-              <Typography variant="h3" gutterBottom>
-                {user.username}
-              </Typography>
-              <Typography variant="h5" color="text.secondary" gutterBottom>
-                {user.mbtiType}
-              </Typography>
-              {user.bio && (
-                <Typography variant="body1" paragraph sx={{ mt: 2 }}>
-                  {user.bio}
-                </Typography>
-              )}
-              <Box sx={{ mt: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                {user.location?.city && (
-                  <Chip
-                    icon={<LocationIcon />}
-                    label={`${user.location.city}, ${user.location.country}`}
-                    variant="outlined"
-                  />
-                )}
-                {user.occupation && (
-                  <Chip
-                    icon={<WorkIcon />}
-                    label={user.occupation}
-                    variant="outlined"
-                  />
-                )}
-                {user.education && (
-                  <Chip
-                    icon={<SchoolIcon />}
-                    label={user.education}
-                    variant="outlined"
-                  />
-                )}
-              </Box>
-              <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                {user.socialLinks?.twitter && (
-                  <IconButton 
-                    component={Link} 
-                    href={user.socialLinks.twitter}
-                    target="_blank"
-                    color="primary"
-                  >
-                    <TwitterIcon />
-                  </IconButton>
-                )}
-                {user.socialLinks?.linkedin && (
-                  <IconButton 
-                    component={Link} 
-                    href={user.socialLinks.linkedin}
-                    target="_blank"
-                    color="primary"
-                  >
-                    <LinkedInIcon />
-                  </IconButton>
-                )}
-                {user.socialLinks?.github && (
-                  <IconButton 
-                    component={Link} 
-                    href={user.socialLinks.github}
-                    target="_blank"
-                    color="primary"
-                  >
-                    <GitHubIcon />
-                  </IconButton>
-                )}
-                {user.socialLinks?.website && (
-                  <IconButton 
-                    component={Link} 
-                    href={user.socialLinks.website}
-                    target="_blank"
-                    color="primary"
-                  >
-                    <WebsiteIcon />
-                  </IconButton>
-                )}
-              </Box>
-            </Grid>
-          </Grid>
-        </Box>
-
         {/* Tabs Section */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs 
@@ -798,174 +932,6 @@ const Profile = () => {
           </Grid>
         </TabPanel>
       </Paper>
-
-      {/* Edit Profile Dialog */}
-      <Dialog 
-        open={isEditing} 
-        onClose={() => setIsEditing(false)}
-        maxWidth="md"
-        fullWidth
-        fullScreen={isMobile}
-      >
-        <DialogTitle>Edit Profile</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Username"
-                  value={editForm.username}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  label="MBTI Type"
-                  value={editForm.mbtiType}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, mbtiType: e.target.value }))}
-                  fullWidth
-                  SelectProps={{
-                    native: true
-                  }}
-                >
-                  <option value="">Select type</option>
-                  {mbtiTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  label="Bio"
-                  value={editForm.bio}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
-                  multiline
-                  rows={4}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-
-            <Divider />
-
-            <Typography variant="h6">Location</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="City"
-                  value={editForm.location.city}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    location: { ...prev.location, city: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Country"
-                  value={editForm.location.country}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    location: { ...prev.location, country: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-
-            <Divider />
-
-            <Typography variant="h6">Professional Info</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Occupation"
-                  value={editForm.occupation}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, occupation: e.target.value }))}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Education"
-                  value={editForm.education}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, education: e.target.value }))}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-
-            <Divider />
-
-            <Typography variant="h6">Social Links</Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Twitter"
-                  value={editForm.socialLinks.twitter}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    socialLinks: { ...prev.socialLinks, twitter: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="LinkedIn"
-                  value={editForm.socialLinks.linkedin}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    socialLinks: { ...prev.socialLinks, linkedin: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="GitHub"
-                  value={editForm.socialLinks.github}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    socialLinks: { ...prev.socialLinks, github: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Website"
-                  value={editForm.socialLinks.website}
-                  onChange={(e) => setEditForm(prev => ({
-                    ...prev,
-                    socialLinks: { ...prev.socialLinks, website: e.target.value }
-                  }))}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsEditing(false)}>Cancel</Button>
-          <Button onClick={handleEditSubmit} variant="contained">Save Changes</Button>
-        </DialogActions>
-      </Dialog>
-
-      {isOwnProfile && (
-        <Box sx={{ mb: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setEditingSection('new')}
-          >
-            Add Section
-          </Button>
-        </Box>
-      )}
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="sections" type="section">
