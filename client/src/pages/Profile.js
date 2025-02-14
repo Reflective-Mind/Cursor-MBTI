@@ -302,6 +302,11 @@ const Profile = () => {
         return;
       }
 
+      console.log('Sending content:', {
+        content: newContent.content,
+        section: selectedSection
+      });
+
       // Use profile._id for API calls
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
         method: 'POST',
@@ -310,8 +315,9 @@ const Profile = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          type: 'text',
-          content: newContent.content
+          description: newContent.content,
+          value: newContent.content,
+          contentType: 'text'
         })
       });
 
@@ -321,16 +327,27 @@ const Profile = () => {
       }
       
       const newContentData = await response.json();
+      console.log('Server response:', newContentData);
       
       // Update the profile state with the new content
-      setProfile(prev => ({
-        ...prev,
-        profileSections: prev.profileSections.map(section => 
-          section.id === selectedSection
-            ? { ...section, content: [...section.content, newContentData] }
-            : section
-        )
-      }));
+      setProfile(prev => {
+        const updatedProfile = {
+          ...prev,
+          profileSections: prev.profileSections.map(section => 
+            section.id === selectedSection
+              ? { 
+                  ...section, 
+                  content: [...(section.content || []), {
+                    ...newContentData,
+                    value: newContent.content // Ensure the content is set in the value field
+                  }]
+                }
+              : section
+          )
+        };
+        console.log('Updated profile:', updatedProfile);
+        return updatedProfile;
+      });
       
       setContentDialog(false);
       setNewContent({ type: 'text', content: '' });
@@ -338,7 +355,7 @@ const Profile = () => {
       setError(null);
 
       // Refresh profile data to ensure we have the latest state
-      fetchProfile();
+      await fetchProfile();
     } catch (error) {
       console.error('Error adding content:', error);
       setError(error.message);
@@ -383,35 +400,46 @@ const Profile = () => {
     }
   };
 
-  const renderContent = (content) => {
-    switch (content.type) {
-      case 'text':
-        return (
-          <Typography variant="body1">{content.content}</Typography>
-        );
-      case 'link':
-        return (
-          <Button
-            href={content.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            startIcon={<WebsiteIcon />}
+  const renderSectionContent = (item) => {
+    console.log('Rendering content item:', item);
+    return (
+      <Box
+        key={item.id}
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          py: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          '&:last-child': {
+            borderBottom: 'none'
+          }
+        }}
+      >
+        <Typography 
+          variant="body1" 
+          sx={{ 
+            flex: 1,
+            color: 'text.primary',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word'
+          }}
+        >
+          {item.description || item.value || item.content || ''}
+        </Typography>
+        {isOwnProfile && (
+          <IconButton
+            size="small"
+            onClick={(e) => handleDeleteContent(section.id, item.id, e)}
+            color="error"
+            sx={{ ml: 1 }}
           >
-            {content.title}
-          </Button>
-        );
-      case 'achievement':
-        return (
-          <Box>
-            <Typography variant="subtitle1">{content.title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {content.content}
-            </Typography>
-          </Box>
-        );
-      default:
-        return null;
-    }
+            <DeleteIcon />
+          </IconButton>
+        )}
+      </Box>
+    );
   };
 
   if (authLoading || loading) {
@@ -534,47 +562,9 @@ const Profile = () => {
                 </Box>
               </AccordionSummary>
               <AccordionDetails sx={{ p: 2 }}>
-                {/* Section Content */}
                 <Box sx={{ pl: 2 }}>
-                  {section.content?.map((item) => (
-                    <Box
-                      key={item.id}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'space-between',
-                        py: 1.5,
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        '&:last-child': {
-                          borderBottom: 'none'
-                        }
-                      }}
-                    >
-                      <Typography 
-                        variant="body1" 
-                        sx={{ 
-                          flex: 1,
-                          color: 'text.primary',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word'
-                        }}
-                      >
-                        {item.content}
-                      </Typography>
-                      {isOwnProfile && (
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleDeleteContent(section.id, item.id, e)}
-                          color="error"
-                          sx={{ ml: 1 }}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      )}
-                    </Box>
-                  ))}
-                  {section.content?.length === 0 && (
+                  {section.content?.map((item) => renderSectionContent(item))}
+                  {(!section.content || section.content.length === 0) && (
                     <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
                       No content yet. {isOwnProfile ? 'Click "Add Text" to add some content.' : ''}
                     </Typography>
