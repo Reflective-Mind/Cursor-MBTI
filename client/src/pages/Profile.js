@@ -115,22 +115,28 @@ const Profile = () => {
         setLoading(true);
         setError(null);
         
-        // If no userId provided and we have currentUser, use current user's ID
+        // If no userId in URL, use current user's ID
         const targetId = userId || currentUser?._id;
         
-        if (!targetId) {
-          setError('No user ID available');
+        // Check if we have a valid ID to fetch
+        if (!targetId && !currentUser?._id) {
+          console.error('No user ID available:', { userId, currentUser });
+          setError('Authentication required');
           setLoading(false);
+          navigate('/login', { state: { from: location.pathname } });
           return;
         }
 
         const token = localStorage.getItem('token');
         if (!token) {
+          setError('Authentication required');
           navigate('/login', { state: { from: location.pathname } });
           return;
         }
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetId}`, {
+        // Use /api/users/me endpoint when viewing own profile
+        const endpoint = !userId ? 'me' : targetId;
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
@@ -139,6 +145,7 @@ const Profile = () => {
 
         if (response.status === 401) {
           localStorage.removeItem('token');
+          setError('Authentication required');
           navigate('/login', { state: { from: location.pathname } });
           return;
         }
@@ -170,7 +177,7 @@ const Profile = () => {
 
     // Only fetch if we're done checking auth
     if (!authLoading) {
-      if (!currentUser) {
+      if (!currentUser && !userId) {
         navigate('/login', { state: { from: location.pathname } });
       } else {
         fetchProfile();
