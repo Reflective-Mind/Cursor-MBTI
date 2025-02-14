@@ -11,9 +11,16 @@ import {
   Grid,
   Card,
   CardContent,
+  Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Edit as EditIcon } from '@mui/icons-material';
 
 const Profile = () => {
   const { userId } = useParams();
@@ -21,8 +28,20 @@ const Profile = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    username: '',
+    mbtiType: '',
+    bio: ''
+  });
   const navigate = useNavigate();
-  const location = useLocation();
+
+  const mbtiTypes = [
+    'INTJ', 'INTP', 'ENTJ', 'ENTP',
+    'INFJ', 'INFP', 'ENFJ', 'ENFP',
+    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+    'ISTP', 'ISFP', 'ESTP', 'ESFP'
+  ];
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -30,7 +49,7 @@ const Profile = () => {
         setLoading(true);
         setError(null);
         
-        // Use the URL parameter userId if available, otherwise use the logged-in user's id
+        // If no userId is provided, use the current user's ID
         const targetUserId = userId || currentUser?._id;
         
         if (!targetUserId) {
@@ -39,16 +58,10 @@ const Profile = () => {
 
         const token = localStorage.getItem('token');
         if (!token) {
-          // Navigate to login with return path
-          navigate('/login', { 
-            state: { from: location },
-            replace: true 
-          });
-          return;
+          throw new Error('Authentication required');
         }
 
-        console.log(`Fetching profile details for user ${targetUserId}`);
-        console.log('Token status:', token ? 'present' : 'missing');
+        console.log('Fetching profile for:', targetUserId);
 
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetUserId}`, {
           headers: {
@@ -57,31 +70,29 @@ const Profile = () => {
           }
         });
 
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
         if (!response.ok) {
           if (response.status === 401) {
             localStorage.removeItem('token');
-            navigate('/login', { 
-              state: { from: location },
-              replace: true 
-            });
-            return;
+            throw new Error('Session expired. Please log in again.');
           }
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to load profile');
         }
 
         const data = await response.json();
-        console.log('Profile data received:', data);
         setUser(data);
+        // Initialize edit form with current data
+        setEditForm({
+          username: data.username || '',
+          mbtiType: data.mbtiType || '',
+          bio: data.bio || ''
+        });
       } catch (err) {
         console.error('Profile loading error:', err);
         setError(err.message);
-        if (err.message.includes('log in')) {
+        if (err.message.includes('log in') || err.message.includes('Authentication required')) {
           navigate('/login', { 
-            state: { from: location },
+            state: { from: `/profile/${userId || ''}` },
             replace: true 
           });
         }
@@ -91,7 +102,38 @@ const Profile = () => {
     };
 
     fetchProfile();
-  }, [userId, currentUser, navigate, location]);
+  }, [userId, currentUser, navigate]);
+
+  const handleEditSubmit = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Authentication required');
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${user._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editForm)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+
+      const updatedUser = await response.json();
+      setUser(updatedUser);
+      setIsEditing(false);
+      // Update local storage if it's the current user
+      if (user._id === currentUser?._id) {
+        localStorage.setItem('mbtiType', updatedUser.mbtiType);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -117,6 +159,8 @@ const Profile = () => {
     );
   }
 
+  const isOwnProfile = currentUser?._id === user._id;
+
   return (
     <Container maxWidth="md" sx={{ mt: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
@@ -140,6 +184,16 @@ const Profile = () => {
               color={user.isOnline ? 'success' : 'default'}
               sx={{ mb: 2 }}
             />
+            {isOwnProfile && (
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={() => setIsEditing(true)}
+                sx={{ mt: 2 }}
+              >
+                Edit Profile
+              </Button>
+            )}
           </Grid>
           <Grid item xs={12} md={8}>
             <Typography variant="h4" gutterBottom>
@@ -177,6 +231,48 @@ const Profile = () => {
             ))}
           </Grid>
         </Box>
+
+        {/* Edit Profile Dialog */}
+        <Dialog open={isEditing} onClose={() => setIsEditing(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Edit Profile</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Username"
+                value={editForm.username}
+                onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
+                fullWidth
+              />
+              <TextField
+                select
+                label="MBTI Type"
+                value={editForm.mbtiType}
+                onChange={(e) => setEditForm(prev => ({ ...prev, mbtiType: e.target.value }))}
+                fullWidth
+                SelectProps={{
+                  native: true
+                }}
+              >
+                <option value="">Select type</option>
+                {mbtiTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </TextField>
+              <TextField
+                label="Bio"
+                value={editForm.bio}
+                onChange={(e) => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
+                multiline
+                rows={4}
+                fullWidth
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setIsEditing(false)}>Cancel</Button>
+            <Button onClick={handleEditSubmit} variant="contained">Save Changes</Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     </Container>
   );

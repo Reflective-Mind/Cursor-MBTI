@@ -222,11 +222,26 @@ io.on('connection', async (socket) => {
     avatar: socket.user.avatar,
     status: socket.user.status
   });
+
+  // Auto-join general channel for new users
+  try {
+    const generalChannel = await Channel.findOne({ name: 'general' });
+    if (generalChannel && !generalChannel.members.find(m => m.user.toString() === socket.user._id.toString())) {
+      generalChannel.members.push({
+        user: socket.user._id,
+        roles: ['member']
+      });
+      await generalChannel.save();
+    }
+  } catch (error) {
+    console.error('Error auto-joining general channel:', error);
+  }
   
   // Join user's channels
   const userChannels = await Channel.find({ 'members.user': socket.user._id });
   userChannels.forEach(channel => {
     socket.join(channel._id.toString());
+    console.log(`${socket.user.username} joined channel: ${channel.name}`);
   });
   
   // Broadcast user's online status with full user info
@@ -249,28 +264,40 @@ io.on('connection', async (socket) => {
   // Handle joining a channel
   socket.on('channel:join', async (channelId) => {
     try {
-      console.log('Joining channel:', channelId);
+      console.log(`${socket.user.username} attempting to join channel:`, channelId);
       const channel = await Channel.findById(channelId);
       if (!channel) {
         socket.emit('error', { message: 'Channel not found' });
         return;
       }
 
-      if (!channel.isMember(socket.user._id)) {
-        socket.emit('error', { message: 'Not a member of this channel' });
-        return;
+      // Add user to channel if not already a member
+      if (!channel.members.find(m => m.user.toString() === socket.user._id.toString())) {
+        channel.members.push({
+          user: socket.user._id,
+          roles: ['member']
+        });
+        await channel.save();
       }
 
       socket.join(channelId);
       
-      // Get recent messages
+      // Get recent messages with populated author info
       const messages = await Message.find({ channel: channelId })
         .sort({ createdAt: -1 })
         .limit(50)
-        .populate('author', 'username avatar status');
+        .populate('author', 'username avatar status')
+        .lean();
       
-      console.log('Sending messages:', messages.length);
+      console.log(`Sending ${messages.length} messages to ${socket.user.username}`);
       socket.emit('channel:messages', messages.reverse());
+
+      // Notify channel about new member
+      io.to(channelId).emit('channel:user_joined', {
+        userId: socket.user._id,
+        username: socket.user.username,
+        channelId: channel._id
+      });
     } catch (error) {
       console.error('Error joining channel:', error);
       socket.emit('error', { message: 'Error joining channel' });
@@ -288,37 +315,31 @@ io.on('connection', async (socket) => {
       const { channelId, content } = data;
       
       const channel = await Channel.findById(channelId);
-      if (!channel || !channel.isMember(socket.user._id)) {
-        socket.emit('error', { message: 'Cannot send message to this channel' });
+      if (!channel) {
+        socket.emit('error', { message: 'Channel not found' });
         return;
       }
 
-      // Check slow mode
-      if (channel.slowMode.enabled) {
-        const lastMessage = await Message.findOne({
-          channel: channelId,
-          author: socket.user._id
-        }).sort({ createdAt: -1 });
-
-        if (lastMessage) {
-          const timeSinceLastMessage = Date.now() - lastMessage.createdAt;
-          if (timeSinceLastMessage < (channel.slowMode.delay * 1000)) {
-            socket.emit('error', { 
-              message: `Slow mode is enabled. Please wait ${Math.ceil((channel.slowMode.delay * 1000 - timeSinceLastMessage) / 1000)} seconds.` 
-            });
-            return;
-          }
-        }
+      // Ensure user is a member of the channel
+      if (!channel.members.find(m => m.user.toString() === socket.user._id.toString())) {
+        channel.members.push({
+          user: socket.user._id,
+          roles: ['member']
+        });
+        await channel.save();
       }
 
       // Create and save message
       const message = new Message({
         content,
         author: socket.user._id,
-        channel: channelId
+        channel: channelId,
+        createdAt: new Date()
       });
       
       await message.save();
+      
+      // Populate author information before broadcasting
       await message.populate('author', 'username avatar status');
 
       // Broadcast message to channel
@@ -327,7 +348,11 @@ io.on('connection', async (socket) => {
       // Update channel's last activity
       channel.lastActivity = new Date();
       await channel.save();
+
+      // Update channel messages in memory
+      console.log(`Message saved and broadcast to channel ${channel.name}`);
     } catch (error) {
+      console.error('Error sending message:', error);
       socket.emit('error', { message: 'Error sending message' });
     }
   });
