@@ -95,7 +95,7 @@ const Profile = () => {
   const [newContentTitle, setNewContentTitle] = useState('');
   const [newContentValue, setNewContentValue] = useState('');
   const [sectionMenuAnchor, setSectionMenuAnchor] = useState(null);
-  const const contentMenuAnchor = useState(null);
+  const [contentMenuAnchorEl, setContentMenuAnchorEl] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
   const [selectedContent, setSelectedContent] = useState(null);
 
@@ -110,7 +110,7 @@ const Profile = () => {
 
   useEffect(() => {
     fetchProfile();
-  }, [userId]);
+  }, [userId, currentUser]);
 
   const fetchProfile = async () => {
     try {
@@ -186,7 +186,8 @@ const Profile = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
       }
 
       const updatedProfile = await response.json();
@@ -195,57 +196,58 @@ const Profile = () => {
       setError(null);
     } catch (error) {
       console.error('Error updating profile:', error);
-      setError('Failed to update profile');
+      setError(error.message || 'Failed to update profile');
     }
   };
 
   const handleChange = (e) => {
-    setEditForm({
-      ...editForm,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleAddLanguage = () => {
-    setEditForm({
-      ...editForm,
-      languages: [...editForm.languages, { name: '', proficiency: 'beginner' }]
-    });
+    setEditForm(prev => ({
+      ...prev,
+      languages: [...prev.languages, { name: '', proficiency: 'beginner' }]
+    }));
   };
 
   const handleRemoveLanguage = (index) => {
-    setEditForm({
-      ...editForm,
-      languages: editForm.languages.filter((_, i) => i !== index)
-    });
+    setEditForm(prev => ({
+      ...prev,
+      languages: prev.languages.filter((_, i) => i !== index)
+    }));
   };
 
   const handleAddInterest = () => {
-    setEditForm({
-      ...editForm,
-      interests: [...editForm.interests, '']
-    });
+    setEditForm(prev => ({
+      ...prev,
+      interests: [...prev.interests, '']
+    }));
   };
 
   const handleRemoveInterest = (index) => {
-    setEditForm({
-      ...editForm,
-      interests: editForm.interests.filter((_, i) => i !== index)
-    });
+    setEditForm(prev => ({
+      ...prev,
+      interests: prev.interests.filter((_, i) => i !== index)
+    }));
   };
 
   const handleAddAchievement = () => {
-    setEditForm({
-      ...editForm,
-      achievements: [...editForm.achievements, { title: '', description: '' }]
-    });
+    setEditForm(prev => ({
+      ...prev,
+      achievements: [...prev.achievements, { title: '', description: '' }]
+    }));
   };
 
   const handleRemoveAchievement = (index) => {
-    setEditForm({
-      ...editForm,
-      achievements: editForm.achievements.filter((_, i) => i !== index)
-    });
+    setEditForm(prev => ({
+      ...prev,
+      achievements: prev.achievements.filter((_, i) => i !== index)
+    }));
   };
 
   const handleAddSection = async () => {
@@ -667,8 +669,8 @@ const Profile = () => {
                       value={language.name}
                       onChange={(e) => {
                         const newLanguages = [...editForm.languages];
-                        newLanguages[index].name = e.target.value;
-                        setEditForm({ ...editForm, languages: newLanguages });
+                        newLanguages[index] = { ...newLanguages[index], name: e.target.value };
+                        setEditForm(prev => ({ ...prev, languages: newLanguages }));
                       }}
                       variant="standard"
                       size="small"
@@ -710,7 +712,7 @@ const Profile = () => {
                       onChange={(e) => {
                         const newInterests = [...editForm.interests];
                         newInterests[index] = e.target.value;
-                        setEditForm({ ...editForm, interests: newInterests });
+                        setEditForm(prev => ({ ...prev, interests: newInterests }));
                       }}
                       variant="standard"
                       size="small"
@@ -748,8 +750,8 @@ const Profile = () => {
                         value={achievement.title}
                         onChange={(e) => {
                           const newAchievements = [...editForm.achievements];
-                          newAchievements[index].title = e.target.value;
-                          setEditForm({ ...editForm, achievements: newAchievements });
+                          newAchievements[index] = { ...newAchievements[index], title: e.target.value };
+                          setEditForm(prev => ({ ...prev, achievements: newAchievements }));
                         }}
                         variant="standard"
                         size="small"
@@ -761,8 +763,8 @@ const Profile = () => {
                         value={achievement.description}
                         onChange={(e) => {
                           const newAchievements = [...editForm.achievements];
-                          newAchievements[index].description = e.target.value;
-                          setEditForm({ ...editForm, achievements: newAchievements });
+                          newAchievements[index] = { ...newAchievements[index], description: e.target.value };
+                          setEditForm(prev => ({ ...prev, achievements: newAchievements }));
                         }}
                         variant="standard"
                         size="small"
