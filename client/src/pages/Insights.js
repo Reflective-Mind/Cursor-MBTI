@@ -17,6 +17,8 @@ import {
   Divider,
   Alert,
   Button,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Work as WorkIcon,
@@ -2912,6 +2914,8 @@ const Insights = () => {
   const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
   const [mbtiType, setMbtiType] = useState(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     const storedType = localStorage.getItem('mbtiType');
@@ -2946,21 +2950,45 @@ const Insights = () => {
   const data = personalityData[mbtiType];
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
+    <Container maxWidth="lg" sx={{ 
+      pb: isMobile ? 7 : 2, // Add padding for bottom navigation
+      px: isMobile ? 1 : 2 
+    }}>
+      <Box sx={{ my: isMobile ? 2 : 4 }}>
+        <Typography 
+          variant="h3" 
+          component="h1" 
+          gutterBottom 
+          align="center"
+          sx={{ fontSize: isMobile ? '1.75rem' : '2.8rem' }}
+        >
           Your Personality Insights
         </Typography>
 
-        <Card sx={{ mb: 4 }}>
+        <Card sx={{ mb: isMobile ? 2 : 4 }}>
           <CardHeader
+            sx={{
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              '& .MuiCardHeader-action': {
+                margin: isMobile ? '8px 0 0' : 0
+              }
+            }}
             title={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="h4">{mbtiType}</Typography>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1,
+                flexWrap: isMobile ? 'wrap' : 'nowrap'
+              }}>
+                <Typography variant="h4" sx={{ fontSize: isMobile ? '1.5rem' : '2rem' }}>
+                  {mbtiType}
+                </Typography>
                 <Chip
                   label={data.nickname}
                   color="primary"
                   variant="outlined"
+                  sx={{ fontSize: isMobile ? '0.875rem' : '1rem' }}
                 />
               </Box>
             }
@@ -2970,9 +2998,13 @@ const Insights = () => {
                 color="secondary"
                 startIcon={<ChatIcon />}
                 onClick={() => navigate('/chat')}
-                sx={{ mt: 1, mr: 1 }}
+                size={isMobile ? "small" : "medium"}
+                sx={{ 
+                  mt: isMobile ? 1 : 0,
+                  whiteSpace: 'nowrap'
+                }}
               >
-                Chat with AI Assistant
+                Chat with AI
               </Button>
             }
           />
@@ -2983,34 +3015,62 @@ const Insights = () => {
           </CardContent>
         </Card>
 
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange} centered>
+        <Box sx={{ 
+          width: '100%',
+          bgcolor: 'background.paper',
+          position: 'relative',
+          mb: 2
+        }}>
+          <Tabs 
+            value={tabValue} 
+            onChange={handleTabChange} 
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons={isMobile ? "auto" : false}
+            allowScrollButtonsMobile
+            centered={!isMobile}
+            sx={{
+              '& .MuiTab-root': {
+                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                minWidth: isMobile ? 'auto' : 120,
+                px: isMobile ? 1 : 2
+              }
+            }}
+          >
             <Tab label="Overview" />
             <Tab label="Career" />
             <Tab label="Relationships" />
             <Tab label="Growth" />
             {data.cognitiveFunctions && <Tab label="Cognitive" />}
             {data.learningStyle && <Tab label="Learning" />}
-            {data.workplaceHabits && <Tab label="Work Style" />}
+            {data.workplaceHabits && <Tab label="Work" />}
           </Tabs>
         </Box>
 
         <TabPanel value={tabValue} index={0}>
-          <Grid container spacing={4}>
+          <Grid container spacing={isMobile ? 2 : 4}>
             <Grid item xs={12} md={6}>
               <Card>
                 <CardHeader
-                  title="Strengths"
+                  title={
+                    <Typography variant="h6" sx={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>
+                      Strengths
+                    </Typography>
+                  }
                   avatar={<StrengthIcon color="primary" />}
                 />
                 <CardContent>
-                  <List>
+                  <List dense={isMobile}>
                     {data.strengths.map((strength, index) => (
                       <ListItem key={index}>
                         <ListItemIcon>
                           <StrengthIcon color="success" />
                         </ListItemIcon>
-                        <ListItemText primary={strength} />
+                        <ListItemText 
+                          primary={strength}
+                          primaryTypographyProps={{
+                            fontSize: isMobile ? '0.875rem' : '1rem'
+                          }}
+                        />
                       </ListItem>
                     ))}
                   </List>
@@ -3020,17 +3080,26 @@ const Insights = () => {
             <Grid item xs={12} md={6}>
               <Card>
                 <CardHeader
-                  title="Challenges"
+                  title={
+                    <Typography variant="h6" sx={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>
+                      Challenges
+                    </Typography>
+                  }
                   avatar={<ChallengeIcon color="error" />}
                 />
                 <CardContent>
-                  <List>
+                  <List dense={isMobile}>
                     {data.challenges.map((challenge, index) => (
                       <ListItem key={index}>
                         <ListItemIcon>
                           <ChallengeIcon color="error" />
                         </ListItemIcon>
-                        <ListItemText primary={challenge} />
+                        <ListItemText 
+                          primary={challenge}
+                          primaryTypographyProps={{
+                            fontSize: isMobile ? '0.875rem' : '1rem'
+                          }}
+                        />
                       </ListItem>
                     ))}
                   </List>

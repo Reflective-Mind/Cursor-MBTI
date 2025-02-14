@@ -18,10 +18,11 @@ import {
   Send as SendIcon,
   Person as PersonIcon,
   Psychology as PsychologyIcon,
-  ArrowUpward as ScrollTopIcon
+  ArrowUpward as ScrollTopIcon,
+  Group as CommunityIcon
 } from '@mui/icons-material';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Chat = () => {
   const theme = useTheme();
@@ -217,17 +218,39 @@ Detailed assessment results:
 
   return (
     <Container maxWidth="md" sx={{ 
-      height: isMobile ? 'calc(100vh - 56px)' : 'calc(100vh - 64px)', 
+      height: isMobile ? 'calc(100vh - 112px)' : 'calc(100vh - 64px)',
       pt: 2,
       pb: isMobile ? 0 : 2
     }}>
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center" sx={{
-          fontSize: isMobile ? '1.75rem' : '3rem',
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
           mb: isMobile ? 1 : 3
         }}>
-          Chat with AI Assistant
-        </Typography>
+          <Typography variant="h3" component="h1" sx={{
+            fontSize: isMobile ? '1.75rem' : '3rem',
+          }}>
+            Chat with AI Assistant
+          </Typography>
+          {isMobile && (
+            <Button
+              component={Link}
+              to="/community"
+              variant="outlined"
+              size="small"
+              startIcon={<CommunityIcon />}
+              sx={{ 
+                borderRadius: '20px',
+                whiteSpace: 'nowrap',
+                minWidth: 'auto'
+              }}
+            >
+              Join Community
+            </Button>
+          )}
+        </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -242,7 +265,8 @@ Detailed assessment results:
             display: 'flex',
             flexDirection: 'column',
             mb: 0,
-            borderRadius: isMobile ? 0 : theme.shape.borderRadius
+            borderRadius: isMobile ? 0 : theme.shape.borderRadius,
+            overflow: 'hidden'
           }}
         >
           <Box
@@ -376,7 +400,7 @@ Detailed assessment results:
             onClick={scrollToTop}
             sx={{
               position: 'fixed',
-              bottom: theme.spacing(2),
+              bottom: isMobile ? theme.spacing(8) : theme.spacing(2),
               right: theme.spacing(2),
               display: showScrollTop ? 'flex' : 'none'
             }}

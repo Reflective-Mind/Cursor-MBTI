@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 
 // Components
 import Navbar from './components/Navbar';
+import BottomNav from './components/BottomNav';
 import Home from './pages/Home';
 import Assessment from './pages/Assessment';
 import Insights from './pages/Insights';
@@ -82,6 +83,7 @@ const theme = createTheme({
         root: {
           '@media (max-width: 600px)': {
             padding: '0 8px',
+            paddingBottom: '56px', // Add space for bottom navigation
           },
         },
       },
@@ -217,6 +219,7 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<Profile />} />
             </Routes>
+            <BottomNav />
           </div>
         </Router>
       </AuthProvider>
