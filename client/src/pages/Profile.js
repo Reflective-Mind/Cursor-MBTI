@@ -168,7 +168,9 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
+      // Use currentUser._id when accessing own profile
+      const userId = isOwnProfile ? currentUser._id : profile._id;
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/sections`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -196,6 +198,9 @@ const Profile = () => {
       setNewSectionDialog(false);
       setNewSection({ title: '', type: 'custom', content: [] });
       setError(null);
+
+      // Refresh profile data to ensure we have the latest state
+      fetchProfile();
     } catch (error) {
       console.error('Error adding section:', error);
       setError(error.message);
@@ -271,9 +276,7 @@ const Profile = () => {
     setSelectedSection(sectionId);
     setNewContent({
       type: 'text',
-      title: '',
-      content: '',
-      url: ''
+      content: ''
     });
     setContentDialog(true);
   };
@@ -291,13 +294,18 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
+      // Use currentUser._id when accessing own profile
+      const userId = isOwnProfile ? currentUser._id : profile._id;
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/sections/${selectedSection}/content`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(newContent)
+        body: JSON.stringify({
+          type: 'text',
+          content: newContent.content
+        })
       });
 
       if (!response.ok) {
@@ -318,9 +326,12 @@ const Profile = () => {
       }));
       
       setContentDialog(false);
-      setNewContent({ type: 'text', title: '', content: '', url: '' });
+      setNewContent({ type: 'text', content: '' });
       setSelectedSection(null);
       setError(null);
+
+      // Refresh profile data to ensure we have the latest state
+      fetchProfile();
     } catch (error) {
       console.error('Error adding content:', error);
       setError(error.message);
@@ -435,6 +446,7 @@ const Profile = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddSection}
+              disabled={profile?.sections?.length >= 10}
             >
               Add Section
             </Button>
@@ -448,114 +460,83 @@ const Profile = () => {
         )}
 
         {/* Sections */}
-        {profile?.sections?.map((section) => (
-          <Accordion
-            key={section.id}
-            expanded={expandedSection === section.id}
-            onChange={() => handleSectionExpand(section.id)}
-            sx={{ mb: 2 }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {profile?.sections?.map((section) => (
+            <Paper
+              key={section.id}
+              elevation={2}
               sx={{ 
-                '&:hover': { 
-                  bgcolor: 'action.hover',
-                  '& .section-actions': { opacity: 1 }
-                }
+                p: 2,
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider'
               }}
             >
               <Box sx={{ 
                 display: 'flex', 
-                alignItems: 'center', 
                 justifyContent: 'space-between',
-                width: '100%',
-                pr: 2
+                alignItems: 'center',
+                mb: 2
               }}>
-                {editingSection === section.id ? (
-                  <TextField
-                    value={section.title}
-                    onChange={(e) => handleUpdateSection(section.id, { title: e.target.value })}
-                    variant="standard"
-                    fullWidth
-                    sx={{ mr: 2 }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <Typography variant="h6">{section.title}</Typography>
-                )}
+                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                  {section.title}
+                </Typography>
                 {isOwnProfile && (
-                  <Box 
-                    className="section-actions" 
-                    sx={{ 
-                      opacity: 0, 
-                      transition: 'opacity 0.2s',
-                      display: 'flex',
-                      gap: 1
-                    }}
-                  >
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      startIcon={<AddIcon />}
+                      onClick={() => handleAddContent(section.id)}
+                      size="small"
+                      variant="outlined"
+                    >
+                      Add Text
+                    </Button>
                     <IconButton
                       size="small"
                       onClick={(e) => handleDeleteSection(section.id, e)}
+                      color="error"
                     >
                       <DeleteIcon />
                     </IconButton>
                   </Box>
                 )}
               </Box>
-            </AccordionSummary>
-            <AccordionDetails>
+              
               {/* Section Content */}
-              <Box sx={{ mb: 2 }}>
+              <Box sx={{ pl: 2 }}>
                 {section.content?.map((item) => (
                   <Box
                     key={item.id}
                     sx={{
                       display: 'flex',
-                      alignItems: 'flex-start',
+                      alignItems: 'center',
                       justifyContent: 'space-between',
-                      mb: 1,
-                      p: 1,
-                      '&:hover': {
-                        bgcolor: 'action.hover',
-                        '& .content-actions': { opacity: 1 }
+                      py: 1,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': {
+                        borderBottom: 'none'
                       }
                     }}
                   >
-                    {renderContent(item)}
+                    <Typography variant="body1">
+                      {item.content}
+                    </Typography>
                     {isOwnProfile && (
-                      <Box 
-                        className="content-actions" 
-                        sx={{ 
-                          opacity: 0, 
-                          transition: 'opacity 0.2s'
-                        }}
+                      <IconButton
+                        size="small"
+                        onClick={(e) => handleDeleteContent(section.id, item.id, e)}
+                        color="error"
                       >
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleDeleteContent(section.id, item.id, e)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
+                        <DeleteIcon />
+                      </IconButton>
                     )}
                   </Box>
                 ))}
               </Box>
-              
-              {/* Add Content Button */}
-              {isOwnProfile && (
-                <Button
-                  startIcon={<AddIcon />}
-                  onClick={() => handleAddContent(section.id)}
-                  variant="outlined"
-                  size="small"
-                >
-                  Add Content
-                </Button>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        ))}
+            </Paper>
+          ))}
+        </Box>
 
         {/* Add Section Dialog */}
         <Dialog open={newSectionDialog} onClose={() => setNewSectionDialog(false)}>
@@ -587,76 +568,19 @@ const Profile = () => {
 
         {/* Add Content Dialog */}
         <Dialog open={contentDialog} onClose={() => setContentDialog(false)}>
-          <DialogTitle>Add Content</DialogTitle>
+          <DialogTitle>Add Text</DialogTitle>
           <DialogContent>
             <TextField
-              select
               margin="dense"
-              label="Content Type"
+              label="Content"
               fullWidth
-              value={newContent.type}
-              onChange={(e) => setNewContent({ ...newContent, type: e.target.value })}
-            >
-              <MenuItem value="text">Text</MenuItem>
-              <MenuItem value="link">Link</MenuItem>
-              <MenuItem value="achievement">Achievement</MenuItem>
-            </TextField>
-
-            {newContent.type === 'link' && (
-              <TextField
-                margin="dense"
-                label="Title"
-                fullWidth
-                value={newContent.title}
-                onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
-              />
-            )}
-
-            {newContent.type === 'achievement' && (
-              <TextField
-                margin="dense"
-                label="Title"
-                fullWidth
-                value={newContent.title}
-                onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
-              />
-            )}
-
-            {newContent.type === 'text' && (
-              <TextField
-                margin="dense"
-                label="Content"
-                fullWidth
-                multiline
-                rows={4}
-                value={newContent.content}
-                onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
-                error={!!error && error.includes('content')}
-                helperText={error && error.includes('content') ? error : ''}
-              />
-            )}
-
-            {newContent.type === 'link' && (
-              <TextField
-                margin="dense"
-                label="URL"
-                fullWidth
-                value={newContent.url}
-                onChange={(e) => setNewContent({ ...newContent, url: e.target.value })}
-              />
-            )}
-
-            {newContent.type === 'achievement' && (
-              <TextField
-                margin="dense"
-                label="Description"
-                fullWidth
-                multiline
-                rows={4}
-                value={newContent.content}
-                onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
-              />
-            )}
+              multiline
+              rows={4}
+              value={newContent.content}
+              onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
+              error={!!error && error.includes('content')}
+              helperText={error && error.includes('content') ? error : ''}
+            />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => {
