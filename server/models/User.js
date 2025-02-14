@@ -39,9 +39,49 @@ const userSchema = new mongoose.Schema({
   },
   bio: {
     type: String,
-    maxlength: 160,
+    maxlength: 500,
     default: ''
   },
+  personalityTraits: [{
+    trait: String,
+    strength: {
+      type: Number,
+      min: 0,
+      max: 100
+    }
+  }],
+  interests: [{
+    type: String,
+    trim: true
+  }],
+  favoriteQuote: {
+    text: String,
+    author: String
+  },
+  socialLinks: {
+    twitter: String,
+    linkedin: String,
+    github: String,
+    website: String
+  },
+  location: {
+    city: String,
+    country: String
+  },
+  occupation: String,
+  education: String,
+  languages: [{
+    name: String,
+    proficiency: {
+      type: String,
+      enum: ['beginner', 'intermediate', 'advanced', 'native']
+    }
+  }],
+  achievements: [{
+    title: String,
+    description: String,
+    date: Date
+  }],
   joinedAt: {
     type: Date,
     default: Date.now
@@ -54,7 +94,22 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['user', 'moderator', 'admin'],
     default: 'user'
-  }]
+  }],
+  theme: {
+    primaryColor: {
+      type: String,
+      default: '#2196f3'
+    },
+    accentColor: {
+      type: String,
+      default: '#f50057'
+    },
+    layout: {
+      type: String,
+      enum: ['classic', 'modern', 'minimal'],
+      default: 'classic'
+    }
+  }
 }, {
   timestamps: true
 });
@@ -86,7 +141,19 @@ userSchema.methods.getPublicProfile = function() {
     status: this.status,
     mbtiType: this.mbtiType,
     bio: this.bio,
-    roles: this.roles
+    personalityTraits: this.personalityTraits,
+    interests: this.interests,
+    favoriteQuote: this.favoriteQuote,
+    socialLinks: this.socialLinks,
+    location: this.location,
+    occupation: this.occupation,
+    education: this.education,
+    languages: this.languages,
+    achievements: this.achievements,
+    theme: this.theme,
+    roles: this.roles,
+    joinedAt: this.joinedAt,
+    lastActive: this.lastActive
   };
 };
 

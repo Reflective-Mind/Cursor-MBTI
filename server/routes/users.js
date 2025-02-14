@@ -97,21 +97,81 @@ router.get('/:userId', auth, async (req, res) => {
 // Update user profile
 router.patch('/:userId', auth, async (req, res) => {
   try {
-    console.log('Test 7 - Update profile request:', {
-      requestedUserId: req.params.userId,
-      requestingUserId: req.user.userId,
-      updates: { ...req.body, password: '[REDACTED]' }
-    });
-
     // Only allow users to update their own profile
     if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ message: 'Not authorized to update this profile' });
     }
 
-    const allowedUpdates = ['username', 'mbtiType', 'bio', 'avatar'];
+    const allowedUpdates = [
+      'username',
+      'mbtiType',
+      'bio',
+      'avatar',
+      'personalityTraits',
+      'interests',
+      'favoriteQuote',
+      'socialLinks',
+      'location',
+      'occupation',
+      'education',
+      'languages',
+      'achievements',
+      'theme'
+    ];
+
     const updates = Object.keys(req.body)
       .filter(key => allowedUpdates.includes(key))
       .reduce((obj, key) => {
+        // Validate nested objects
+        if (['personalityTraits', 'interests', 'languages', 'achievements'].includes(key)) {
+          if (!Array.isArray(req.body[key])) {
+            throw new Error(`${key} must be an array`);
+          }
+        }
+        
+        // Validate personality traits
+        if (key === 'personalityTraits') {
+          req.body[key].forEach(trait => {
+            if (!trait.trait || typeof trait.strength !== 'number' || 
+                trait.strength < 0 || trait.strength > 100) {
+              throw new Error('Invalid personality trait format');
+            }
+          });
+        }
+
+        // Validate languages
+        if (key === 'languages') {
+          req.body[key].forEach(lang => {
+            if (!lang.name || !['beginner', 'intermediate', 'advanced', 'native'].includes(lang.proficiency)) {
+              throw new Error('Invalid language format');
+            }
+          });
+        }
+
+        // Validate social links
+        if (key === 'socialLinks') {
+          const allowedSocialLinks = ['twitter', 'linkedin', 'github', 'website'];
+          Object.keys(req.body[key]).forEach(social => {
+            if (!allowedSocialLinks.includes(social)) {
+              throw new Error('Invalid social link type');
+            }
+          });
+        }
+
+        // Validate theme
+        if (key === 'theme') {
+          const { primaryColor, accentColor, layout } = req.body[key];
+          if (layout && !['classic', 'modern', 'minimal'].includes(layout)) {
+            throw new Error('Invalid theme layout');
+          }
+          if (primaryColor && !/^#[0-9A-F]{6}$/i.test(primaryColor)) {
+            throw new Error('Invalid primary color format');
+          }
+          if (accentColor && !/^#[0-9A-F]{6}$/i.test(accentColor)) {
+            throw new Error('Invalid accent color format');
+          }
+        }
+
         obj[key] = req.body[key];
         return obj;
       }, {});
@@ -130,15 +190,9 @@ router.patch('/:userId', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    console.log('Test 7 - Profile updated successfully:', {
-      userId: user._id,
-      username: user.username,
-      mbtiType: user.mbtiType
-    });
-
     res.json(user);
   } catch (error) {
-    console.error('Test 7 - Error updating user profile:', {
+    console.error('Error updating user profile:', {
       error: error.message,
       stack: error.stack,
       requestedUserId: req.params.userId
@@ -151,7 +205,10 @@ router.patch('/:userId', auth, async (req, res) => {
       });
     }
 
-    res.status(500).json({ message: 'Error updating user profile' });
+    res.status(500).json({ 
+      message: 'Error updating user profile',
+      details: error.message
+    });
   }
 });
 
