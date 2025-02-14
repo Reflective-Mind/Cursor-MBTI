@@ -1503,6 +1503,13 @@ const Assessment = () => {
           return;
         }
 
+        // Map test type to category
+        const testTypeMapping = {
+          'quick': 'mbti-8',
+          'standard': 'mbti-24',
+          'expert': 'mbti-100'
+        };
+
         // Prepare questions data
         const allQuestions = questions.reduce((acc, category) => {
           return acc.concat(category.questions.map(q => ({
@@ -1520,7 +1527,7 @@ const Assessment = () => {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            testType: selectedTest.id,
+            testType: testTypeMapping[selectedTest.id],
             result: result,
             answers: Object.entries(answers).map(([questionId, value]) => ({
               questionId,
