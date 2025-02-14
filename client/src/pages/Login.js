@@ -9,6 +9,8 @@ import {
   Tab,
   Tabs,
   Alert,
+  CircularProgress,
+  MenuItem
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,7 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, register } = useAuth();
+  const { login, register, error: authError, loading: authLoading } = useAuth();
   const [tab, setTab] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
@@ -27,8 +29,14 @@ const Login = () => {
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get the return URL from location state or default to '/community'
   const from = location.state?.from?.pathname || '/community';
+
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+      setIsSubmitting(false);
+    }
+  }, [authError]);
 
   const handleTabChange = (event, newValue) => {
     setTab(newValue);
@@ -36,12 +44,44 @@ const Login = () => {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setError(null);
+  };
+
+  const validateForm = () => {
+    if (tab === 1) { // Register
+      if (!formData.username.trim()) {
+        setError('Username is required');
+        return false;
+      }
+      if (!formData.mbtiType) {
+        setError('MBTI Type is required');
+        return false;
+      }
+    }
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+    if (!formData.password) {
+      setError('Password is required');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -70,6 +110,8 @@ const Login = () => {
     'ISTP', 'ISFP', 'ESTP', 'ESFP'
   ];
 
+  const isLoading = isSubmitting || authLoading;
+
   return (
     <Container maxWidth="sm">
       <Box sx={{ mt: 8, mb: 4 }}>
@@ -79,8 +121,8 @@ const Login = () => {
           </Typography>
           
           <Tabs value={tab} onChange={handleTabChange} centered sx={{ mb: 3 }}>
-            <Tab label="Login" />
-            <Tab label="Register" />
+            <Tab label="Login" disabled={isLoading} />
+            <Tab label="Register" disabled={isLoading} />
           </Tabs>
 
           {error && (
@@ -98,7 +140,8 @@ const Login = () => {
                   value={formData.username}
                   onChange={handleChange}
                   required
-                  disabled={isSubmitting}
+                  disabled={isLoading}
+                  autoComplete="username"
                 />
               )}
               
@@ -109,7 +152,8 @@ const Login = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                disabled={isSubmitting}
+                disabled={isLoading}
+                autoComplete={tab === 0 ? "email" : "new-email"}
               />
               
               <TextField
@@ -119,7 +163,8 @@ const Login = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                disabled={isSubmitting}
+                disabled={isLoading}
+                autoComplete={tab === 0 ? "current-password" : "new-password"}
               />
 
               {tab === 1 && (
@@ -130,16 +175,13 @@ const Login = () => {
                   value={formData.mbtiType}
                   onChange={handleChange}
                   required
-                  disabled={isSubmitting}
-                  SelectProps={{
-                    native: true,
-                  }}
+                  disabled={isLoading}
                 >
-                  <option value="">Select your type</option>
+                  <MenuItem value="">Select your type</MenuItem>
                   {mbtiTypes.map((type) => (
-                    <option key={type} value={type}>
+                    <MenuItem key={type} value={type}>
                       {type}
-                    </option>
+                    </MenuItem>
                   ))}
                 </TextField>
               )}
@@ -148,10 +190,17 @@ const Login = () => {
                 type="submit"
                 variant="contained"
                 size="large"
-                disabled={isSubmitting}
+                disabled={isLoading}
                 sx={{ mt: 2 }}
               >
-                {isSubmitting ? 'Please wait...' : (tab === 0 ? 'Login' : 'Register')}
+                {isLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={20} color="inherit" />
+                    <span>Please wait...</span>
+                  </Box>
+                ) : (
+                  tab === 0 ? 'Login' : 'Register'
+                )}
               </Button>
             </Box>
           </form>

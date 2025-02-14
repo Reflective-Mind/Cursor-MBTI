@@ -109,24 +109,40 @@ const Profile = () => {
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
   useEffect(() => {
+    if (!currentUser && !loading) {
+      navigate('/login', { state: { from: location } });
+      return;
+    }
     fetchProfile();
-  }, [userId, currentUser]);
+  }, [userId, currentUser, loading]);
 
   const fetchProfile = async () => {
     try {
       const targetId = userId || currentUser?._id;
       if (!targetId) {
-        navigate('/login');
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login', { state: { from: location } });
         return;
       }
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${targetId}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         },
         credentials: 'include'
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('mbtiType');
+        navigate('/login', { state: { from: location } });
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch profile');

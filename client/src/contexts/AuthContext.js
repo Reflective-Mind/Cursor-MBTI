@@ -13,6 +13,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -29,8 +30,7 @@ export const AuthProvider = ({ children }) => {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           },
-          credentials: 'include',
-          mode: 'cors'
+          credentials: 'include'
         });
 
         if (!response.ok) {
@@ -38,7 +38,6 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('token');
             localStorage.removeItem('mbtiType');
             setUser(null);
-            return;
           }
           throw new Error('Failed to check authentication');
         }
@@ -58,43 +57,11 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (email, password) => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        credentials: 'include',
-        mode: 'cors',
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to login');
-      }
-
-      if (!data.token) {
-        throw new Error('No token received from server');
-      }
-
-      localStorage.setItem('token', data.token);
-      if (data.user?.mbtiType) {
-        localStorage.setItem('mbtiType', data.user.mbtiType);
-      }
-      setUser(data.user);
-      return data.user;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
-
   const register = async (username, email, password, mbtiType) => {
     try {
+      setLoading(true);
+      setError(null);
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
@@ -102,7 +69,6 @@ export const AuthProvider = ({ children }) => {
           'Accept': 'application/json'
         },
         credentials: 'include',
-        mode: 'cors',
         body: JSON.stringify({
           username,
           email,
@@ -129,24 +95,71 @@ export const AuthProvider = ({ children }) => {
       return data.user;
     } catch (error) {
       console.error('Registration error:', error);
+      setError(error.message);
       throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (email, password) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to login');
+      }
+
+      if (!data.token) {
+        throw new Error('No token received from server');
+      }
+
+      localStorage.setItem('token', data.token);
+      if (data.user?.mbtiType) {
+        localStorage.setItem('mbtiType', data.user.mbtiType);
+      }
+      setUser(data.user);
+      return data.user;
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept': 'application/json'
-        },
-        credentials: 'include',
-        mode: 'cors'
-      });
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        });
 
-      if (!response.ok) {
-        console.error('Logout failed:', response.statusText);
+        if (!response.ok) {
+          console.error('Logout failed:', response.statusText);
+        }
       }
     } catch (error) {
       console.error('Logout error:', error);
@@ -154,12 +167,14 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('mbtiType');
       setUser(null);
+      setLoading(false);
     }
   };
 
   const value = {
     user,
     loading,
+    error,
     login,
     logout,
     register,
@@ -168,7 +183,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
