@@ -9,12 +9,23 @@ import {
   Avatar,
   CircularProgress,
   Alert,
+  useTheme,
+  useMediaQuery,
+  IconButton,
+  Fab,
 } from '@mui/material';
-import { Send as SendIcon, Person as PersonIcon, Psychology as PsychologyIcon } from '@mui/icons-material';
+import {
+  Send as SendIcon,
+  Person as PersonIcon,
+  Psychology as PsychologyIcon,
+  ArrowUpward as ScrollTopIcon
+} from '@mui/icons-material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const Chat = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [messages, setMessages] = useState([{
     role: 'assistant',
     content: 'Hello! I am your MBTI personality assistant. I can help you understand your personality type better and provide personalized advice. What would you like to know?'
@@ -22,9 +33,11 @@ const Chat = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const messagesEndRef = useRef(null);
   const [mbtiType, setMbtiType] = useState(null);
   const navigate = useNavigate();
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -57,8 +70,31 @@ const Chat = () => {
     }
   }, [navigate]);
 
+  // Handle scroll to show/hide scroll to top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (chatContainerRef.current) {
+        const { scrollTop } = chatContainerRef.current;
+        setShowScrollTop(scrollTop > 300);
+      }
+    };
+
+    const container = chatContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToTop = () => {
+    chatContainerRef.current?.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   };
 
   useEffect(() => {
@@ -111,15 +147,12 @@ Detailed assessment results:
       const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const apiUrl = `${baseUrl}/api/chat/message`;
 
-      console.log('Test 5 - Sending chat request:', {
+      console.log('Test 9 - Sending chat request:', {
         url: apiUrl,
         messages: messages.length,
         token: token ? 'Present' : 'Missing',
         systemMessage: 'Present',
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          REACT_APP_API_URL: process.env.REACT_APP_API_URL
-        }
+        isMobile
       });
 
       const response = await axios.post(apiUrl, {
@@ -135,20 +168,7 @@ Detailed assessment results:
           'Accept': 'application/json'
         },
         withCredentials: true,
-        timeout: 30000,
-        validateStatus: function (status) {
-          return status >= 200 && status < 500;
-        }
-      });
-
-      console.log('Test 5 - Chat API response:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: response.data ? {
-          choices: response.data.choices?.length,
-          message: response.data.choices?.[0]?.message ? 'Present' : 'Missing'
-        } : 'Missing',
-        headers: response.headers
+        timeout: 30000
       });
 
       if (response.status === 401) {
@@ -158,29 +178,13 @@ Detailed assessment results:
         return;
       }
 
-      if (response.status !== 200 || !response.data) {
-        throw new Error('Test 5 - ' + (response.data?.error?.message || response.data?.message || 'Chat API error'));
-      }
-
-      if (!response.data.choices?.[0]?.message) {
-        throw new Error('Test 5 - Invalid response format from API');
-      }
-
       const assistantMessage = response.data.choices[0].message;
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Test 5 - Chat API Error:', {
+      console.error('Test 9 - Chat API Error:', {
         message: error.message,
         response: error.response?.data,
-        status: error.response?.status,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: {
-            ...error.config?.headers,
-            Authorization: error.config?.headers?.Authorization ? 'Present' : 'Missing'
-          }
-        }
+        isMobile
       });
 
       if (error.response?.status === 401) {
@@ -191,12 +195,12 @@ Detailed assessment results:
       }
 
       const errorMessage = error.response?.data?.details || error.message;
-      setError(`Test 5 - ${errorMessage}`);
+      setError(`Error: ${errorMessage}`);
       setMessages((prev) => [
         ...prev,
         {
           role: 'error',
-          content: `Test 5 - Error: ${errorMessage}`,
+          content: `Error: ${errorMessage}`,
         },
       ]);
     } finally {
@@ -212,13 +216,17 @@ Detailed assessment results:
   };
 
   return (
-    <Container maxWidth="md">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
+    <Container maxWidth="md" sx={{ 
+      height: isMobile ? 'calc(100vh - 56px)' : 'calc(100vh - 64px)', 
+      pt: 2,
+      pb: isMobile ? 0 : 2
+    }}>
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Typography variant="h3" component="h1" gutterBottom align="center" sx={{
+          fontSize: isMobile ? '1.75rem' : '3rem',
+          mb: isMobile ? 1 : 3
+        }}>
           Chat with AI Assistant
-        </Typography>
-        <Typography variant="subtitle1" align="center" color="text.secondary" paragraph>
-          Ask questions about your personality type and get personalized advice
         </Typography>
 
         {error && (
@@ -230,17 +238,19 @@ Detailed assessment results:
         <Paper
           elevation={3}
           sx={{
-            height: '60vh',
+            flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            mb: 2,
+            mb: 0,
+            borderRadius: isMobile ? 0 : theme.shape.borderRadius
           }}
         >
           <Box
+            ref={chatContainerRef}
             sx={{
               flex: 1,
               overflowY: 'auto',
-              p: 2,
+              p: isMobile ? 1 : 2,
               display: 'flex',
               flexDirection: 'column',
               gap: 2,
@@ -258,6 +268,8 @@ Detailed assessment results:
                 <Avatar
                   sx={{
                     bgcolor: message.role === 'user' ? 'primary.main' : 'secondary.main',
+                    width: isMobile ? 32 : 40,
+                    height: isMobile ? 32 : 40
                   }}
                 >
                   {message.role === 'user' ? <PersonIcon /> : <PsychologyIcon />}
@@ -265,8 +277,8 @@ Detailed assessment results:
                 <Paper
                   elevation={1}
                   sx={{
-                    p: 2,
-                    maxWidth: '70%',
+                    p: isMobile ? 1.5 : 2,
+                    maxWidth: '75%',
                     bgcolor: message.role === 'user' ? 'primary.light' : 'background.paper',
                   }}
                 >
@@ -274,6 +286,7 @@ Detailed assessment results:
                     sx={{
                       color: message.role === 'user' ? 'common.white' : 'text.primary',
                       whiteSpace: 'pre-wrap',
+                      fontSize: isMobile ? '0.875rem' : '1rem',
                     }}
                   >
                     {message.content}
@@ -294,7 +307,13 @@ Detailed assessment results:
             <div ref={messagesEndRef} />
           </Box>
 
-          <Box sx={{ p: 2, bgcolor: 'background.paper' }}>
+          <Box sx={{ 
+            p: isMobile ? 1 : 2, 
+            bgcolor: 'background.paper',
+            borderTop: 1,
+            borderColor: 'divider',
+            position: 'relative'
+          }}>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <TextField
                 fullWidth
@@ -305,27 +324,66 @@ Detailed assessment results:
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
                 variant="outlined"
-                size="small"
+                size={isMobile ? "small" : "medium"}
                 disabled={isLoading}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: isMobile ? '20px' : theme.shape.borderRadius,
+                  }
+                }}
               />
-              <Button
-                variant="contained"
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                sx={{ minWidth: 100 }}
-              >
-                {isLoading ? (
-                  <CircularProgress size={24} color="inherit" />
-                ) : (
-                  <>
-                    Send
-                    <SendIcon sx={{ ml: 1 }} />
-                  </>
-                )}
-              </Button>
+              {isMobile ? (
+                <IconButton
+                  color="primary"
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  sx={{ 
+                    alignSelf: 'flex-end',
+                    mb: '4px'
+                  }}
+                >
+                  {isLoading ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    <SendIcon />
+                  )}
+                </IconButton>
+              ) : (
+                <Button
+                  variant="contained"
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  sx={{ minWidth: 100 }}
+                >
+                  {isLoading ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : (
+                    <>
+                      Send
+                      <SendIcon sx={{ ml: 1 }} />
+                    </>
+                  )}
+                </Button>
+              )}
             </Box>
           </Box>
         </Paper>
+
+        {showScrollTop && (
+          <Fab
+            color="primary"
+            size="small"
+            onClick={scrollToTop}
+            sx={{
+              position: 'fixed',
+              bottom: theme.spacing(2),
+              right: theme.spacing(2),
+              display: showScrollTop ? 'flex' : 'none'
+            }}
+          >
+            <ScrollTopIcon />
+          </Fab>
+        )}
       </Box>
     </Container>
   );

@@ -77,6 +77,15 @@ const theme = createTheme({
     },
   },
   components: {
+    MuiContainer: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 600px)': {
+            padding: '0 8px',
+          },
+        },
+      },
+    },
     MuiPaper: {
       styleOverrides: {
         root: {
@@ -84,6 +93,9 @@ const theme = createTheme({
           backgroundColor: 'rgba(2, 8, 24, 0.8)',
           backdropFilter: 'blur(10px)',
           boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+          '@media (max-width: 600px)': {
+            borderRadius: 0,
+          },
         },
       },
     },
@@ -93,6 +105,9 @@ const theme = createTheme({
           background: 'rgba(2, 8, 24, 0.8)',
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
+          '@media (max-width: 600px)': {
+            borderRadius: 0,
+          },
         },
       },
     },
@@ -101,6 +116,10 @@ const theme = createTheme({
         root: {
           borderRadius: '30px',
           textTransform: 'none',
+          '@media (max-width: 600px)': {
+            padding: '6px 16px',
+            fontSize: '0.875rem',
+          },
         },
         contained: {
           background: 'linear-gradient(45deg, #2196f3, #64b5f6)',
@@ -117,6 +136,56 @@ const theme = createTheme({
           background: 'rgba(2, 8, 24, 0.9)',
           backdropFilter: 'blur(10px)',
           boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+          '@media (max-width: 600px)': {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+          },
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          '@media (max-width: 600px)': {
+            margin: '16px',
+            width: 'calc(100% - 32px)',
+            maxHeight: 'calc(100% - 32px)',
+          },
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 600px)': {
+            fontSize: '0.875rem',
+          },
+        },
+      },
+    },
+    MuiTypography: {
+      styleOverrides: {
+        h1: {
+          '@media (max-width: 600px)': {
+            fontSize: '2rem',
+          },
+        },
+        h2: {
+          '@media (max-width: 600px)': {
+            fontSize: '1.75rem',
+          },
+        },
+        h3: {
+          '@media (max-width: 600px)': {
+            fontSize: '1.5rem',
+          },
+        },
+        h4: {
+          '@media (max-width: 600px)': {
+            fontSize: '1.25rem',
+          },
         },
       },
     },
@@ -132,6 +201,10 @@ function App() {
           <div className="App" style={{
             minHeight: '100vh',
             background: 'linear-gradient(180deg, #020818 0%, #000000 100%)',
+            paddingTop: '56px', // Add padding for fixed mobile navbar
+            '@media (min-width: 600px)': {
+              paddingTop: '64px',
+            },
           }}>
             <Navbar />
             <Routes>
