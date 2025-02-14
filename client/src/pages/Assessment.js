@@ -1491,20 +1491,27 @@ const Assessment = () => {
   };
 
   const handleNext = async () => {
+    if (!questions[activeStep]) {
+      console.error('No questions found for current step');
+      return;
+    }
+
     const currentQuestions = questions[activeStep].questions;
     const isLastStep = activeStep === questions.length - 1;
     const hasAnsweredAll = currentQuestions.every((q) => answers[q.id]);
 
     if (!hasAnsweredAll) {
-      return; // Don't proceed if not all questions are answered
+      setError('Please answer all questions before proceeding');
+      return;
     }
 
     if (isLastStep) {
-      const result = calculatePersonalityType();
-      console.log('Calculated personality result:', result);
-      setPersonalityType(result.type);
-      
       try {
+        setIsLoading(true);
+        const result = calculatePersonalityType();
+        console.log('Calculated personality result:', result);
+        setPersonalityType(result.type);
+        
         const token = localStorage.getItem('token');
         if (!token) {
           navigate('/login');
@@ -1518,6 +1525,10 @@ const Assessment = () => {
           'expert': 'mbti-100'
         };
 
+        if (!selectedTest || !selectedTest.id) {
+          throw new Error('No test type selected');
+        }
+
         // Prepare questions data
         const allQuestions = questions.reduce((acc, category) => {
           return acc.concat(category.questions.map(q => ({
@@ -1527,7 +1538,6 @@ const Assessment = () => {
           })));
         }, []);
 
-        setIsLoading(true);
         // Store test results
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me/test-results`, {
           method: 'POST',
@@ -1549,6 +1559,9 @@ const Assessment = () => {
         if (!response.ok) {
           throw new Error('Failed to store test results');
         }
+
+        const responseData = await response.json();
+        console.log('Server response:', responseData);
 
         localStorage.setItem('mbtiType', result.type);
         localStorage.setItem('mbtiDetails', JSON.stringify(result));
@@ -1578,7 +1591,7 @@ const Assessment = () => {
   const isStepComplete = () => {
     if (!questions[activeStep]) return false;
     const currentQuestions = questions[activeStep].questions;
-    return currentQuestions.every((q) => answers[q.id]);
+    return currentQuestions && currentQuestions.every((q) => answers[q.id]);
   };
 
   const handleViewInsights = () => {
@@ -1908,6 +1921,13 @@ Keep responses concise (2-4 sentences) and use simple language.`
 
   return (
     <Container maxWidth="md">
+      {error && (
+        <Box sx={{ mt: 2 }}>
+          <Typography color="error" align="center">
+            {error}
+          </Typography>
+        </Box>
+      )}
       <Box sx={{ my: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom align="center">
           MBTI Personality Assessment
