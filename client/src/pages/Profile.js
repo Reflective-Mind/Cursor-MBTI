@@ -344,6 +344,13 @@ const Profile = () => {
 
   const handleAddSection = async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(`${baseUrl}/api/users/${user._id}/sections`, {
         method: 'POST',
         headers: {
@@ -365,6 +372,13 @@ const Profile = () => {
 
   const handleUpdateSection = async (sectionId, updates) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}`, {
         method: 'PATCH',
         headers: {
@@ -386,6 +400,13 @@ const Profile = () => {
 
   const handleDeleteSection = async (sectionId) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}`, {
         method: 'DELETE',
         headers: {
@@ -403,6 +424,13 @@ const Profile = () => {
 
   const handleAddContent = async (sectionId) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(`${baseUrl}/api/users/${user._id}/sections/${sectionId}/content`, {
         method: 'POST',
         headers: {
@@ -432,6 +460,13 @@ const Profile = () => {
 
   const handleUpdateContent = async (sectionId, contentId, updates) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(
         `${baseUrl}/api/users/${user._id}/sections/${sectionId}/content/${contentId}`,
         {
@@ -465,6 +500,13 @@ const Profile = () => {
 
   const handleDeleteContent = async (sectionId, contentId) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
       const response = await fetch(
         `${baseUrl}/api/users/${user._id}/sections/${sectionId}/content/${contentId}`,
         {
