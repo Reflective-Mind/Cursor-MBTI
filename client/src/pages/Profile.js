@@ -75,8 +75,16 @@ const Profile = () => {
   const [newSectionDialog, setNewSectionDialog] = useState(false);
   const [newSection, setNewSection] = useState({
     title: '',
+    type: 'container',
+    content: []
+  });
+  const [contentDialog, setContentDialog] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [newContent, setNewContent] = useState({
     type: 'text',
-    content: ''
+    title: '',
+    content: '',
+    url: ''
   });
 
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
@@ -139,6 +147,11 @@ const Profile = () => {
   };
 
   const handleAddSection = () => {
+    setNewSection({
+      title: '',
+      type: 'container',
+      content: []
+    });
     setNewSectionDialog(true);
   };
 
@@ -156,7 +169,11 @@ const Profile = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(newSection)
+        body: JSON.stringify({
+          title: newSection.title,
+          type: 'container',
+          content: []
+        })
       });
 
       if (!response.ok) throw new Error('Failed to add section');
@@ -164,7 +181,7 @@ const Profile = () => {
       const updatedProfile = await response.json();
       setProfile(updatedProfile);
       setNewSectionDialog(false);
-      setNewSection({ title: '', type: 'text', content: '' });
+      setNewSection({ title: '', type: 'container', content: [] });
     } catch (error) {
       setError(error.message);
     }
@@ -222,6 +239,101 @@ const Profile = () => {
       setProfile(updatedProfile);
     } catch (error) {
       setError(error.message);
+    }
+  };
+
+  const handleAddContent = (sectionId) => {
+    setSelectedSection(sectionId);
+    setNewContent({
+      type: 'text',
+      title: '',
+      content: '',
+      url: ''
+    });
+    setContentDialog(true);
+  };
+
+  const handleSaveContent = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newContent)
+      });
+
+      if (!response.ok) throw new Error('Failed to add content');
+      
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
+      setContentDialog(false);
+      setNewContent({ type: 'text', title: '', content: '', url: '' });
+      setSelectedSection(null);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleDeleteContent = async (sectionId, contentId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to delete content');
+      
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const renderContent = (content) => {
+    switch (content.type) {
+      case 'text':
+        return (
+          <Typography variant="body1">{content.content}</Typography>
+        );
+      case 'link':
+        return (
+          <Button
+            href={content.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            startIcon={<WebsiteIcon />}
+          >
+            {content.title}
+          </Button>
+        );
+      case 'achievement':
+        return (
+          <Box>
+            <Typography variant="subtitle1">{content.title}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {content.content}
+            </Typography>
+          </Box>
+        );
+      default:
+        return null;
     }
   };
 
@@ -317,16 +429,49 @@ const Profile = () => {
               </Box>
             </AccordionSummary>
             <AccordionDetails>
-              {section.type === 'text' && (
-                <TextField
-                  value={section.content}
-                  onChange={(e) => handleUpdateSection(section.id, { content: e.target.value })}
-                  multiline
-                  fullWidth
-                  disabled={!isOwnProfile || editingSection !== section.id}
-                />
+              {/* Section Content */}
+              <Box sx={{ mb: 2 }}>
+                {section.content?.map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      mb: 1,
+                      p: 1,
+                      '&:hover': {
+                        bgcolor: 'action.hover',
+                        '& .content-actions': { opacity: 1 }
+                      }
+                    }}
+                  >
+                    {renderContent(item)}
+                    {isOwnProfile && (
+                      <Box className="content-actions" sx={{ opacity: 0, transition: 'opacity 0.2s' }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteContent(section.id, item.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+              
+              {/* Add Content Button */}
+              {isOwnProfile && (
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => handleAddContent(section.id)}
+                  variant="outlined"
+                  size="small"
+                >
+                  Add Content
+                </Button>
               )}
-              {/* Add more section types here */}
             </AccordionDetails>
           </Accordion>
         ))}
@@ -344,23 +489,87 @@ const Profile = () => {
             value={newSection.title}
             onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
           />
-          <TextField
-            select
-            margin="dense"
-            label="Section Type"
-            fullWidth
-            value={newSection.type}
-            onChange={(e) => setNewSection({ ...newSection, type: e.target.value })}
-          >
-            <MenuItem value="text">Text</MenuItem>
-            <MenuItem value="list">List</MenuItem>
-            <MenuItem value="links">Links</MenuItem>
-            <MenuItem value="achievements">Achievements</MenuItem>
-          </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setNewSectionDialog(false)}>Cancel</Button>
           <Button onClick={handleSaveNewSection} variant="contained">Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Content Dialog */}
+      <Dialog open={contentDialog} onClose={() => setContentDialog(false)}>
+        <DialogTitle>Add Content</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            margin="dense"
+            label="Content Type"
+            fullWidth
+            value={newContent.type}
+            onChange={(e) => setNewContent({ ...newContent, type: e.target.value })}
+          >
+            <MenuItem value="text">Text</MenuItem>
+            <MenuItem value="link">Link</MenuItem>
+            <MenuItem value="achievement">Achievement</MenuItem>
+          </TextField>
+
+          {newContent.type === 'link' && (
+            <TextField
+              margin="dense"
+              label="Title"
+              fullWidth
+              value={newContent.title}
+              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+            />
+          )}
+
+          {newContent.type === 'achievement' && (
+            <TextField
+              margin="dense"
+              label="Title"
+              fullWidth
+              value={newContent.title}
+              onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+            />
+          )}
+
+          {newContent.type === 'text' && (
+            <TextField
+              margin="dense"
+              label="Content"
+              fullWidth
+              multiline
+              rows={4}
+              value={newContent.content}
+              onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
+            />
+          )}
+
+          {newContent.type === 'link' && (
+            <TextField
+              margin="dense"
+              label="URL"
+              fullWidth
+              value={newContent.url}
+              onChange={(e) => setNewContent({ ...newContent, url: e.target.value })}
+            />
+          )}
+
+          {newContent.type === 'achievement' && (
+            <TextField
+              margin="dense"
+              label="Description"
+              fullWidth
+              multiline
+              rows={4}
+              value={newContent.content}
+              onChange={(e) => setNewContent({ ...newContent, content: e.target.value })}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setContentDialog(false)}>Cancel</Button>
+          <Button onClick={handleSaveContent} variant="contained">Add</Button>
         </DialogActions>
       </Dialog>
     </Container>
