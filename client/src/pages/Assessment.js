@@ -1491,7 +1491,15 @@ const Assessment = () => {
   };
 
   const handleNext = async () => {
-    if (activeStep === questions.length - 1) {
+    const currentQuestions = questions[activeStep].questions;
+    const isLastStep = activeStep === questions.length - 1;
+    const hasAnsweredAll = currentQuestions.every((q) => answers[q.id]);
+
+    if (!hasAnsweredAll) {
+      return; // Don't proceed if not all questions are answered
+    }
+
+    if (isLastStep) {
       const result = calculatePersonalityType();
       console.log('Calculated personality result:', result);
       setPersonalityType(result.type);
@@ -1519,6 +1527,7 @@ const Assessment = () => {
           })));
         }, []);
 
+        setIsLoading(true);
         // Store test results
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/me/test-results`, {
           method: 'POST',
@@ -1548,6 +1557,8 @@ const Assessment = () => {
       } catch (error) {
         console.error('Error storing test results:', error);
         setError('Failed to store test results. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     } else {
       setActiveStep((prev) => prev + 1);
@@ -1565,7 +1576,7 @@ const Assessment = () => {
   };
 
   const isStepComplete = () => {
-    if (activeStep >= questions.length) return true;
+    if (!questions[activeStep]) return false;
     const currentQuestions = questions[activeStep].questions;
     return currentQuestions.every((q) => answers[q.id]);
   };
