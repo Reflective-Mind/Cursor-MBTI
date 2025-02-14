@@ -168,7 +168,7 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -242,7 +242,7 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections/${sectionId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -291,7 +291,7 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections/${selectedSection}/content`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${selectedSection}/content`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -336,7 +336,7 @@ const Profile = () => {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}/sections/${sectionId}/content/${contentId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
