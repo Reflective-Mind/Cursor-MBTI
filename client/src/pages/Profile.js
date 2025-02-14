@@ -18,20 +18,26 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
-  Tabs,
-  Tab,
-  LinearProgress,
-  Divider,
-  useTheme,
-  useMediaQuery,
-  Link,
-  Menu,
+  Collapse,
   MenuItem,
   ListItemIcon,
   ListItemText,
+  useTheme,
+  useMediaQuery,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Tooltip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  ExpandMore as ExpandMoreIcon,
+  DragIndicator as DragIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  MoreVert as MoreIcon,
   LocationOn as LocationIcon,
   Work as WorkIcon,
   School as SchoolIcon,
@@ -42,28 +48,10 @@ import {
   LinkedIn as LinkedInIcon,
   GitHub as GitHubIcon,
   Language as WebsiteIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  DragIndicator as DragIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  MoreVert as MoreIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-
-// TabPanel component for profile sections
-const TabPanel = ({ children, value, index, ...other }) => (
-  <div
-    role="tabpanel"
-    hidden={value !== index}
-    id={`profile-tabpanel-${index}`}
-    {...other}
-  >
-    {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-  </div>
-);
 
 const Profile = () => {
   const theme = useTheme();
@@ -77,38 +65,23 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
   const [editForm, setEditForm] = useState({
     username: '',
     mbtiType: '',
-    bio: '',
-    location: '',
-    occupation: '',
-    education: '',
-    languages: [],
-    interests: [],
-    achievements: []
+    sections: []
   });
-  const [sections, setSections] = useState([]);
+  const [expandedSection, setExpandedSection] = useState(null);
   const [editingSection, setEditingSection] = useState(null);
-  const [editingContent, setEditingContent] = useState(null);
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [newContentTitle, setNewContentTitle] = useState('');
-  const [newContentValue, setNewContentValue] = useState('');
-  const [sectionMenuAnchor, setSectionMenuAnchor] = useState(null);
-  const [contentMenuAnchorEl, setContentMenuAnchorEl] = useState(null);
-  const [selectedSection, setSelectedSection] = useState(null);
-  const [selectedContent, setSelectedContent] = useState(null);
-
-  const mbtiTypes = [
-    'INTJ', 'INTP', 'ENTJ', 'ENTP',
-    'INFJ', 'INFP', 'ENFJ', 'ENFP',
-    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
-    'ISTP', 'ISFP', 'ESTP', 'ESFP'
-  ];
+  const [newSectionDialog, setNewSectionDialog] = useState(false);
+  const [newSection, setNewSection] = useState({
+    title: '',
+    type: 'text',
+    content: ''
+  });
 
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
+  // Fetch profile data
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -122,8 +95,6 @@ const Profile = () => {
           return;
         }
 
-        // If we're on /profile (no userId), use the /me endpoint
-        // Otherwise, use the specific user endpoint
         const endpoint = !userId ? 'me' : userId;
         const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${endpoint}`, {
           headers: {
@@ -132,7 +103,7 @@ const Profile = () => {
           }
         });
 
-        if (response.status === 401) {
+        if (!response.status === 401) {
           localStorage.removeItem('token');
           setError('Authentication required');
           navigate('/login', { state: { from: location.pathname } });
@@ -148,13 +119,7 @@ const Profile = () => {
         setEditForm({
           username: data.username || '',
           mbtiType: data.mbtiType || '',
-          bio: data.bio || '',
-          location: data.location || '',
-          occupation: data.occupation || '',
-          education: data.education || '',
-          languages: data.languages || [],
-          interests: data.interests || [],
-          achievements: data.achievements || []
+          sections: data.sections || []
         });
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -164,116 +129,20 @@ const Profile = () => {
       }
     };
 
-    // Only fetch if we're done checking auth
     if (!authLoading) {
       fetchProfile();
     }
   }, [userId, authLoading, navigate, location.pathname]);
 
-  const handleEdit = () => {
-    setIsEditing(true);
+  const handleSectionExpand = (sectionId) => {
+    setExpandedSection(expandedSection === sectionId ? null : sectionId);
   };
 
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditForm({
-      username: profile.username || '',
-      mbtiType: profile.mbtiType || '',
-      bio: profile.bio || '',
-      location: profile.location || '',
-      occupation: profile.occupation || '',
-      education: profile.education || '',
-      languages: profile.languages || [],
-      interests: profile.interests || [],
-      achievements: profile.achievements || []
-    });
+  const handleAddSection = () => {
+    setNewSectionDialog(true);
   };
 
-  const handleSave = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${currentUser._id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(editForm)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update profile');
-      }
-
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
-      setIsEditing(false);
-      setError(null);
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleAddLanguage = () => {
-    setEditForm(prev => ({
-      ...prev,
-      languages: [...prev.languages, { name: '', proficiency: 'beginner' }]
-    }));
-  };
-
-  const handleRemoveLanguage = (index) => {
-    setEditForm(prev => ({
-      ...prev,
-      languages: prev.languages.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleAddInterest = () => {
-    setEditForm(prev => ({
-      ...prev,
-      interests: [...prev.interests, '']
-    }));
-  };
-
-  const handleRemoveInterest = (index) => {
-    setEditForm(prev => ({
-      ...prev,
-      interests: prev.interests.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleAddAchievement = () => {
-    setEditForm(prev => ({
-      ...prev,
-      achievements: [...prev.achievements, { title: '', description: '' }]
-    }));
-  };
-
-  const handleRemoveAchievement = (index) => {
-    setEditForm(prev => ({
-      ...prev,
-      achievements: prev.achievements.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleAddSection = async () => {
+  const handleSaveNewSection = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -281,24 +150,28 @@ const Profile = () => {
         return;
       }
 
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ title: newSectionTitle || 'New Section' })
+        body: JSON.stringify(newSection)
       });
 
       if (!response.ok) throw new Error('Failed to add section');
       
-      const newSection = await response.json();
-      setSections([...sections, newSection]);
-      setNewSectionTitle('');
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
+      setNewSectionDialog(false);
+      setNewSection({ title: '', type: 'text', content: '' });
     } catch (error) {
       setError(error.message);
     }
+  };
+
+  const handleEditSection = (sectionId) => {
+    setEditingSection(sectionId);
   };
 
   const handleUpdateSection = async (sectionId, updates) => {
@@ -309,8 +182,7 @@ const Profile = () => {
         return;
       }
 
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections/${sectionId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -321,8 +193,8 @@ const Profile = () => {
 
       if (!response.ok) throw new Error('Failed to update section');
       
-      const updatedSections = await response.json();
-      setSections(updatedSections);
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
       setEditingSection(null);
     } catch (error) {
       setError(error.message);
@@ -337,8 +209,7 @@ const Profile = () => {
         return;
       }
 
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections/${sectionId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections/${sectionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -347,186 +218,14 @@ const Profile = () => {
 
       if (!response.ok) throw new Error('Failed to delete section');
       
-      setSections(sections.filter(s => s.id !== sectionId));
+      const updatedProfile = await response.json();
+      setProfile(updatedProfile);
     } catch (error) {
       setError(error.message);
     }
   };
 
-  const handleAddContent = async (sectionId) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(`${baseUrl}/api/users/${profile._id}/sections/${sectionId}/content`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title: newContentTitle || 'New Item',
-          value: newContentValue
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to add content');
-      
-      const newContent = await response.json();
-      setSections(sections.map(section => 
-        section.id === sectionId
-          ? { ...section, content: [...section.content, newContent] }
-          : section
-      ));
-      setNewContentTitle('');
-      setNewContentValue('');
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleUpdateContent = async (sectionId, contentId, updates) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(
-        `${baseUrl}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(updates)
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to update content');
-      
-      const updatedContent = await response.json();
-      setSections(sections.map(section => 
-        section.id === sectionId
-          ? {
-              ...section,
-              content: section.content.map(c => 
-                c.id === contentId ? updatedContent : c
-              )
-            }
-          : section
-      ));
-      setEditingContent(null);
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleDeleteContent = async (sectionId, contentId) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
-      const baseUrl = process.env.REACT_APP_API_URL?.replace(/\/+$/, '') || '';
-      const response = await fetch(
-        `${baseUrl}/api/users/${profile._id}/sections/${sectionId}/content/${contentId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to delete content');
-      
-      setSections(sections.map(section => 
-        section.id === sectionId
-          ? {
-              ...section,
-              content: section.content.filter(c => c.id !== contentId)
-            }
-          : section
-      ));
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
-  const handleDragEnd = async (result) => {
-    if (!result.destination) return;
-
-    const { source, destination, type } = result;
-
-    if (type === 'section') {
-      const reorderedSections = Array.from(sections);
-      const [removed] = reorderedSections.splice(source.index, 1);
-      reorderedSections.splice(destination.index, 0, removed);
-
-      // Update order for all affected sections
-      const updates = reorderedSections.map((section, index) => 
-        handleUpdateSection(section.id, { order: index })
-      );
-      
-      await Promise.all(updates);
-      setSections(reorderedSections);
-    } else if (type === 'content') {
-      const sourceSection = sections.find(s => s.id === source.droppableId);
-      const destSection = sections.find(s => s.id === destination.droppableId);
-
-      if (sourceSection && destSection) {
-        const newSections = [...sections];
-        const sourceContent = [...sourceSection.content];
-        const destContent = source.droppableId === destination.droppableId
-          ? sourceContent
-          : [...destSection.content];
-
-        const [removed] = sourceContent.splice(source.index, 1);
-        destContent.splice(destination.index, 0, removed);
-
-        // Update the sections
-        if (source.droppableId === destination.droppableId) {
-          // Same section, just reorder
-          const updates = destContent.map((content, index) =>
-            handleUpdateContent(destSection.id, content.id, { order: index })
-          );
-          await Promise.all(updates);
-        } else {
-          // Different sections
-          const sourceUpdates = sourceContent.map((content, index) =>
-            handleUpdateContent(sourceSection.id, content.id, { order: index })
-          );
-          const destUpdates = destContent.map((content, index) =>
-            handleUpdateContent(destSection.id, content.id, { order: index })
-          );
-          await Promise.all([...sourceUpdates, ...destUpdates]);
-        }
-
-        setSections(newSections.map(section => {
-          if (section.id === source.droppableId) {
-            return { ...section, content: sourceContent };
-          }
-          if (section.id === destination.droppableId) {
-            return { ...section, content: destContent };
-          }
-          return section;
-        }));
-      }
-    }
-  };
-
-  // Show loading state while checking authentication
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
         <CircularProgress />
@@ -534,7 +233,6 @@ const Profile = () => {
     );
   }
 
-  // Show error if any
   if (error) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
@@ -543,19 +241,7 @@ const Profile = () => {
     );
   }
 
-  // Show loading state while fetching profile
-  if (loading) {
-    return (
-      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
-    );
-  }
-
-  // Don't render anything if no profile data
-  if (!profile) {
-    return null;
-  }
+  if (!profile) return null;
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
@@ -569,266 +255,114 @@ const Profile = () => {
               {profile?.username?.[0]?.toUpperCase()}
             </Avatar>
             <Box>
-              {isEditing ? (
-                <TextField
-                  name="username"
-                  value={editForm.username}
-                  onChange={handleChange}
-                  variant="standard"
-                  sx={{ mb: 1 }}
-                />
-              ) : (
-                <Typography variant="h4">{profile?.username}</Typography>
-              )}
-              {isEditing ? (
-                <TextField
-                  name="mbtiType"
-                  value={editForm.mbtiType}
-                  onChange={handleChange}
-                  variant="standard"
-                  size="small"
-                />
-              ) : (
-                <Chip label={profile?.mbtiType} color="primary" />
-              )}
+              <Typography variant="h4">{profile.username}</Typography>
+              <Chip label={profile.mbtiType} color="primary" />
             </Box>
           </Box>
           {isOwnProfile && (
-            <Box>
-              {isEditing ? (
-                <>
-                  <IconButton onClick={handleSave} color="primary">
-                    <SaveIcon />
-                  </IconButton>
-                  <IconButton onClick={handleCancel} color="error">
-                    <CancelIcon />
-                  </IconButton>
-                </>
-              ) : (
-                <IconButton onClick={handleEdit} color="primary">
-                  <EditIcon />
-                </IconButton>
-              )}
-            </Box>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleAddSection}
+            >
+              Add Section
+            </Button>
           )}
         </Box>
 
-        <Divider sx={{ my: 3 }} />
-
-        {/* Bio Section */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>About Me</Typography>
-          {isEditing ? (
-            <TextField
-              name="bio"
-              value={editForm.bio}
-              onChange={handleChange}
-              multiline
-              rows={4}
-              fullWidth
-            />
-          ) : (
-            <Typography>{profile?.bio || 'No bio available'}</Typography>
-          )}
-        </Box>
-
-        {/* Info Section */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocationIcon color="action" />
-              {isEditing ? (
-                <TextField
-                  name="location"
-                  value={editForm.location}
-                  onChange={handleChange}
-                  variant="standard"
-                  fullWidth
-                  placeholder="Location"
-                />
-              ) : (
-                <Typography>{profile?.location || 'Location not specified'}</Typography>
-              )}
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <WorkIcon color="action" />
-              {isEditing ? (
-                <TextField
-                  name="occupation"
-                  value={editForm.occupation}
-                  onChange={handleChange}
-                  variant="standard"
-                  fullWidth
-                  placeholder="Occupation"
-                />
-              ) : (
-                <Typography>{profile?.occupation || 'Occupation not specified'}</Typography>
-              )}
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <SchoolIcon color="action" />
-              {isEditing ? (
-                <TextField
-                  name="education"
-                  value={editForm.education}
-                  onChange={handleChange}
-                  variant="standard"
-                  fullWidth
-                  placeholder="Education"
-                />
-              ) : (
-                <Typography>{profile?.education || 'Education not specified'}</Typography>
-              )}
-            </Box>
-          </Grid>
-        </Grid>
-
-        <Divider sx={{ my: 3 }} />
-
-        {/* Languages Section */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Languages</Typography>
-            {isEditing && (
-              <IconButton onClick={handleAddLanguage} color="primary" size="small">
-                <AddIcon />
-              </IconButton>
-            )}
-          </Box>
-          <Grid container spacing={2}>
-            {(isEditing ? editForm.languages : profile?.languages || []).map((language, index) => (
-              <Grid item key={index}>
-                {isEditing ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TextField
-                      value={language.name}
-                      onChange={(e) => {
-                        const newLanguages = [...editForm.languages];
-                        newLanguages[index] = { ...newLanguages[index], name: e.target.value };
-                        setEditForm(prev => ({ ...prev, languages: newLanguages }));
-                      }}
-                      variant="standard"
-                      size="small"
-                      placeholder="Language"
-                    />
-                    <IconButton onClick={() => handleRemoveLanguage(index)} size="small" color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                ) : (
-                  <Chip
-                    icon={<LanguageIcon />}
-                    label={language.name}
-                    variant="outlined"
+        {/* Sections */}
+        {profile.sections?.map((section) => (
+          <Accordion
+            key={section.id}
+            expanded={expandedSection === section.id}
+            onChange={() => handleSectionExpand(section.id)}
+            sx={{ mb: 2 }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMoreIcon />}
+              sx={{ 
+                '&:hover': { 
+                  bgcolor: 'action.hover',
+                  '& .edit-buttons': { opacity: 1 }
+                }
+              }}
+            >
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                width: '100%'
+              }}>
+                {editingSection === section.id ? (
+                  <TextField
+                    value={section.title}
+                    onChange={(e) => handleUpdateSection(section.id, { title: e.target.value })}
+                    variant="standard"
+                    fullWidth
+                    sx={{ mr: 2 }}
                   />
+                ) : (
+                  <Typography variant="h6">{section.title}</Typography>
                 )}
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-
-        {/* Interests Section */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Interests</Typography>
-            {isEditing && (
-              <IconButton onClick={handleAddInterest} color="primary" size="small">
-                <AddIcon />
-              </IconButton>
-            )}
-          </Box>
-          <Grid container spacing={2}>
-            {(isEditing ? editForm.interests : profile?.interests || []).map((interest, index) => (
-              <Grid item key={index}>
-                {isEditing ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TextField
-                      value={interest}
-                      onChange={(e) => {
-                        const newInterests = [...editForm.interests];
-                        newInterests[index] = e.target.value;
-                        setEditForm(prev => ({ ...prev, interests: newInterests }));
-                      }}
-                      variant="standard"
-                      size="small"
-                      placeholder="Interest"
-                    />
-                    <IconButton onClick={() => handleRemoveInterest(index)} size="small" color="error">
+                {isOwnProfile && (
+                  <Box className="edit-buttons" sx={{ opacity: 0, transition: 'opacity 0.2s' }}>
+                    <IconButton size="small" onClick={() => handleEditSection(section.id)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => handleDeleteSection(section.id)}>
                       <DeleteIcon />
                     </IconButton>
                   </Box>
-                ) : (
-                  <Chip label={interest} />
                 )}
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-
-        {/* Achievements Section */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h6">Achievements</Typography>
-            {isEditing && (
-              <IconButton onClick={handleAddAchievement} color="primary" size="small">
-                <AddIcon />
-              </IconButton>
-            )}
-          </Box>
-          <Grid container spacing={2}>
-            {(isEditing ? editForm.achievements : profile?.achievements || []).map((achievement, index) => (
-              <Grid item xs={12} key={index}>
-                {isEditing ? (
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <TextField
-                        value={achievement.title}
-                        onChange={(e) => {
-                          const newAchievements = [...editForm.achievements];
-                          newAchievements[index] = { ...newAchievements[index], title: e.target.value };
-                          setEditForm(prev => ({ ...prev, achievements: newAchievements }));
-                        }}
-                        variant="standard"
-                        size="small"
-                        fullWidth
-                        placeholder="Achievement Title"
-                        sx={{ mb: 1 }}
-                      />
-                      <TextField
-                        value={achievement.description}
-                        onChange={(e) => {
-                          const newAchievements = [...editForm.achievements];
-                          newAchievements[index] = { ...newAchievements[index], description: e.target.value };
-                          setEditForm(prev => ({ ...prev, achievements: newAchievements }));
-                        }}
-                        variant="standard"
-                        size="small"
-                        fullWidth
-                        multiline
-                        placeholder="Achievement Description"
-                      />
-                    </Box>
-                    <IconButton onClick={() => handleRemoveAchievement(index)} size="small" color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                ) : (
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>{achievement.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {achievement.description}
-                    </Typography>
-                  </Paper>
-                )}
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              {section.type === 'text' && (
+                <TextField
+                  value={section.content}
+                  onChange={(e) => handleUpdateSection(section.id, { content: e.target.value })}
+                  multiline
+                  fullWidth
+                  disabled={!isOwnProfile || editingSection !== section.id}
+                />
+              )}
+              {/* Add more section types here */}
+            </AccordionDetails>
+          </Accordion>
+        ))}
       </Paper>
+
+      {/* Add Section Dialog */}
+      <Dialog open={newSectionDialog} onClose={() => setNewSectionDialog(false)}>
+        <DialogTitle>Add New Section</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Section Title"
+            fullWidth
+            value={newSection.title}
+            onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
+          />
+          <TextField
+            select
+            margin="dense"
+            label="Section Type"
+            fullWidth
+            value={newSection.type}
+            onChange={(e) => setNewSection({ ...newSection, type: e.target.value })}
+          >
+            <MenuItem value="text">Text</MenuItem>
+            <MenuItem value="list">List</MenuItem>
+            <MenuItem value="links">Links</MenuItem>
+            <MenuItem value="achievements">Achievements</MenuItem>
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNewSectionDialog(false)}>Cancel</Button>
+          <Button onClick={handleSaveNewSection} variant="contained">Add</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
