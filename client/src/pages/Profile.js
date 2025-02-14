@@ -49,7 +49,7 @@ import {
   Cancel as CancelIcon,
   MoreVert as MoreIcon,
 } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -69,8 +69,9 @@ const Profile = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { userId } = useParams();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -109,23 +110,30 @@ const Profile = () => {
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
   useEffect(() => {
-    if (!currentUser && !loading) {
-      navigate('/login', { state: { from: location } });
+    // Don't redirect while still checking authentication
+    if (authLoading) {
       return;
     }
-    fetchProfile();
-  }, [userId, currentUser, loading]);
 
-  const fetchProfile = async () => {
+    // If no user and finished loading auth, redirect to login
+    if (!currentUser) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+
+    // If no userId provided, use current user's ID
+    const targetId = userId || currentUser._id;
+    if (targetId) {
+      fetchProfile(targetId);
+    }
+  }, [userId, currentUser, authLoading, location.pathname]);
+
+  const fetchProfile = async (targetId) => {
     try {
-      const targetId = userId || currentUser?._id;
-      if (!targetId) {
-        return;
-      }
-
+      setLoading(true);
       const token = localStorage.getItem('token');
       if (!token) {
-        navigate('/login', { state: { from: location } });
+        navigate('/login', { state: { from: location.pathname } });
         return;
       }
 
@@ -140,7 +148,7 @@ const Profile = () => {
       if (response.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('mbtiType');
-        navigate('/login', { state: { from: location } });
+        navigate('/login', { state: { from: location.pathname } });
         return;
       }
 
@@ -518,7 +526,8 @@ const Profile = () => {
     }
   };
 
-  if (loading) {
+  // Show loading state while checking authentication
+  if (authLoading || loading) {
     return (
       <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
         <CircularProgress />
@@ -526,12 +535,18 @@ const Profile = () => {
     );
   }
 
+  // Show error if any
   if (error) {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Alert severity="error">{error}</Alert>
       </Container>
     );
+  }
+
+  // Don't render anything while redirecting
+  if (!currentUser) {
+    return null;
   }
 
   return (
