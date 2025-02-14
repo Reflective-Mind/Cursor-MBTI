@@ -122,6 +122,10 @@ const Profile = () => {
       }
 
       const data = await response.json();
+      // Initialize sections as an empty array if it doesn't exist
+      data.sections = data.sections || [];
+      data.profileSections = data.profileSections || [];
+      
       setProfile(data);
       setEditForm({
         username: data.username || '',
@@ -148,6 +152,11 @@ const Profile = () => {
   };
 
   const handleAddSection = () => {
+    // Check section limit before opening dialog
+    if (profile?.sections?.length >= 10) {
+      setError('Cannot add more than 10 sections');
+      return;
+    }
     setNewSection({
       title: '',
       type: 'container',
@@ -446,6 +455,7 @@ const Profile = () => {
               startIcon={<AddIcon />}
               onClick={handleAddSection}
               disabled={profile?.sections?.length >= 10}
+              title={profile?.sections?.length >= 10 ? 'Maximum number of sections reached' : 'Add new section'}
             >
               Add Section
             </Button>
