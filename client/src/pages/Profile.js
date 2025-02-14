@@ -129,7 +129,8 @@ const Profile = () => {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
-          }
+          },
+          credentials: 'include'
         });
 
         if (!response.ok) {
@@ -190,8 +191,10 @@ const Profile = () => {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(editForm)
       });
 
@@ -549,22 +552,32 @@ const Profile = () => {
               {user.username?.[0]}
             </Avatar>
             <Box>
-              <Typography variant="h4">{user.username}</Typography>
-              <Typography variant="h6" color="text.secondary">{user.mbtiType}</Typography>
+              {!isEditing ? (
+                <>
+                  <Typography variant="h4">{user.username}</Typography>
+                  <Typography variant="h6" color="text.secondary">{user.mbtiType}</Typography>
+                </>
+              ) : null}
             </Box>
           </Box>
-          {user._id === currentUser?._id && (
+          {isOwnProfile && (
             <Button
               variant="contained"
               startIcon={isEditing ? <SaveIcon /> : <EditIcon />}
-              onClick={() => isEditing ? handleEditSubmit() : setIsEditing(true)}
+              onClick={() => {
+                if (isEditing) {
+                  handleEditSubmit();
+                } else {
+                  setIsEditing(true);
+                }
+              }}
             >
               {isEditing ? 'Save Changes' : 'Edit Profile'}
             </Button>
           )}
         </Box>
 
-        {isEditing && user._id === currentUser?._id ? (
+        {isEditing && isOwnProfile ? (
           <Box component="form" sx={{ mt: 3 }}>
             <Grid container spacing={3}>
               <Grid item xs={12} sm={6}>
@@ -691,13 +704,6 @@ const Profile = () => {
             </Box>
 
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleEditSubmit}
-              >
-                Save Changes
-              </Button>
               <Button
                 variant="outlined"
                 onClick={() => {
