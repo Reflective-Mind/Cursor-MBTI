@@ -68,7 +68,7 @@ const Profile = () => {
   const [editForm, setEditForm] = useState({
     username: '',
     mbtiType: '',
-    sections: []
+    profileSections: []
   });
   const [expandedSection, setExpandedSection] = useState(null);
   const [editingSection, setEditingSection] = useState(null);
@@ -122,15 +122,14 @@ const Profile = () => {
       }
 
       const data = await response.json();
-      // Initialize sections as an empty array if it doesn't exist
-      data.sections = data.sections || [];
+      // Initialize profileSections as an empty array if it doesn't exist
       data.profileSections = data.profileSections || [];
       
       setProfile(data);
       setEditForm({
         username: data.username || '',
         mbtiType: data.mbtiType || '',
-        sections: data.sections || []
+        profileSections: data.profileSections || []
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -153,13 +152,13 @@ const Profile = () => {
 
   const handleAddSection = () => {
     // Check section limit before opening dialog
-    if (profile?.sections?.length >= 10) {
+    if (profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10)) {
       setError('Cannot add more than 10 sections');
       return;
     }
     setNewSection({
       title: '',
-      type: 'container',
+      type: 'custom',
       content: []
     });
     setNewSectionDialog(true);
@@ -201,7 +200,7 @@ const Profile = () => {
       // Update the profile state with the new section
       setProfile(prev => ({
         ...prev,
-        sections: [...(prev.sections || []), newSectionData]
+        profileSections: [...(prev.profileSections || []), newSectionData]
       }));
       
       setNewSectionDialog(false);
@@ -271,7 +270,7 @@ const Profile = () => {
       // Remove the section from the profile state
       setProfile(prev => ({
         ...prev,
-        sections: prev.sections.filter(section => section.id !== sectionId)
+        profileSections: prev.profileSections.filter(section => section.id !== sectionId)
       }));
       
       setError(null);
@@ -326,7 +325,7 @@ const Profile = () => {
       // Update the profile state with the new content
       setProfile(prev => ({
         ...prev,
-        sections: prev.sections.map(section => 
+        profileSections: prev.profileSections.map(section => 
           section.id === selectedSection
             ? { ...section, content: [...section.content, newContentData] }
             : section
@@ -370,7 +369,7 @@ const Profile = () => {
       // Remove the content from the profile state
       setProfile(prev => ({
         ...prev,
-        sections: prev.sections.map(section =>
+        profileSections: prev.profileSections.map(section =>
           section.id === sectionId
             ? { ...section, content: section.content.filter(item => item.id !== contentId) }
             : section
@@ -454,8 +453,8 @@ const Profile = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddSection}
-              disabled={profile?.sections?.length >= 10}
-              title={profile?.sections?.length >= 10 ? 'Maximum number of sections reached' : 'Add new section'}
+              disabled={profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10)}
+              title={profile?.profileSections?.length >= (profile?.sectionLimits?.maxMainSections || 10) ? 'Maximum number of sections reached' : 'Add new section'}
             >
               Add Section
             </Button>
@@ -470,7 +469,7 @@ const Profile = () => {
 
         {/* Sections */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {profile?.sections?.map((section) => (
+          {profile?.profileSections?.map((section) => (
             <Paper
               key={section.id}
               elevation={2}
