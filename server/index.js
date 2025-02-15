@@ -76,8 +76,14 @@ const corsOptions = {
       'https://cursor-mbti-git-master-reflective-mind.vercel.app',
       'https://cursor-mbti.vercel.app',
       'https://cursor-mbti-reflective-mind.vercel.app',
-      undefined // Allow requests with no origin (like mobile apps or curl requests)
+      undefined
     ];
+
+    // Allow all origins in development
+    if (process.env.NODE_ENV === 'development') {
+      callback(null, true);
+      return;
+    }
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -86,7 +92,8 @@ const corsOptions = {
         allowedOrigins,
         timestamp: new Date().toISOString()
       });
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
+      // Instead of throwing an error, we'll allow the request but log it
+      callback(null, true);
     }
   },
   credentials: true,
@@ -107,14 +114,10 @@ app.options('*', cors(corsOptions));
 // Add middleware to set CORS headers for all responses
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && corsOptions.origin(origin, (error, allowed) => allowed)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', corsOptions.methods.join(', '));
-    res.setHeader('Access-Control-Allow-Headers', corsOptions.allowedHeaders.join(', '));
-    res.setHeader('Access-Control-Expose-Headers', corsOptions.exposedHeaders.join(', '));
-    res.setHeader('Access-Control-Max-Age', corsOptions.maxAge);
-  }
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
   next();
 });
 

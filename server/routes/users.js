@@ -11,8 +11,8 @@ console.log('Initializing users router');
 let mistral;
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { Mistral } = require('@mistralai/mistralai');
-    mistral = new Mistral(process.env.MISTRAL_API_KEY);
+    const { MistralClient } = require('@mistralai/mistralai');
+    mistral = new MistralClient(process.env.MISTRAL_API_KEY);
     console.log('Users Router: Mistral AI client initialized successfully');
   }
 } catch (error) {
@@ -555,15 +555,15 @@ Make it personal, engaging, and positive.`;
     console.log('Generating story with Mistral AI...');
     
     // Generate story using Mistral AI
-    const response = await mistral.chat({
+    const response = await mistral.chatCompletions.create({
       model: "mistral-tiny",
       messages: [
         { role: "system", content: "You are an expert MBTI analyst who writes engaging, personalized stories about people's personalities." },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      maxTokens: 500,
-      topP: 0.9
+      max_tokens: 500,
+      top_p: 0.9
     });
 
     console.log('Mistral AI response received:', {

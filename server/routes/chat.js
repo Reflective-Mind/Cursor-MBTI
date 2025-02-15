@@ -9,8 +9,8 @@ console.log('Initializing chat router');
 let mistral;
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { Mistral } = require('@mistralai/mistralai');
-    mistral = new Mistral(process.env.MISTRAL_API_KEY);
+    const { MistralClient } = require('@mistralai/mistralai');
+    mistral = new MistralClient(process.env.MISTRAL_API_KEY);
     console.log('Chat Router: Mistral AI client initialized successfully');
   }
 } catch (error) {
@@ -114,12 +114,12 @@ Answers: ${result.answers?.map(a => `Q: ${a.question} A: ${a.answer}`).join(' | 
 
     let response;
     console.log('Test 5 - Using Mistral AI');
-    response = await mistral.chat({
+    response = await mistral.chatCompletions.create({
       model: "mistral-tiny",
       messages: messages,
       temperature: 0.7,
-      maxTokens: 150,
-      topP: 0.9
+      max_tokens: 150,
+      top_p: 0.9
     });
     
     console.log('Test 5 - Raw Mistral response:', JSON.stringify(response, null, 2));
