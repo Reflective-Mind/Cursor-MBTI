@@ -664,7 +664,7 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
     });
 
     // Prepare the prompt for AI
-    const prompt = `Create a complete personality showcase based on these MBTI test results:
+    const prompt = `As an advanced MBTI analyst, create a unique and personalized analysis for this user based on their test results:
 
 Test History:
 ${testBreakdown.map(test => `${test.category}: ${test.type} (Taken: ${new Date(test.date).toLocaleDateString()})`).join('\n')}
@@ -678,45 +678,50 @@ ${Object.entries(averageTraits)
 Latest Test Dominant Traits:
 ${Object.entries(testResults[0].result.dominantTraits || {}).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
 
-Create a structured personality showcase following this format:
+Create a professional and personal showcase following this exact structure:
 
 1. Profile Title
-"${testResults[0].result.type} - [Add descriptive title based on dominant traits]"
+${testResults[0].result.type} - Professional & Personal Overview
 
 2. Summary Introduction
-• Write 2-3 sentences summarizing their MBTI type based on all tests taken
-• Describe their core personality traits and how they process information
-• Keep it professional and engaging while remaining factual
+• Summarize their core MBTI traits based on their specific test scores
+• Explain how their individual scores reflect their thought processes and behavior
+• Focus on their unique combination of traits and percentages
 
-3. Key Personality Strengths
-• List 3-4 major strengths based on their highest scoring traits
-• Each strength should have a brief explanation
-• If any trait is balanced (close to 50%), mention that as a unique advantage
+3. Key Personality Strengths (3-4 bullet points)
+• Base each strength on their highest scoring traits from the test data
+• Include specific percentages and explain why they are advantageous
+• If any traits are balanced (close to 50%), highlight this as a unique strength
 
-4. Areas for Growth
-• List 2-3 development areas based on their test scores
-• Make suggestions constructive and actionable
-• Focus on professional and personal development opportunities
+4. Areas for Growth (2-3 bullet points)
+• Provide constructive improvement suggestions based on their actual test scores
+• Make recommendations specific to their MBTI type and score patterns
+• Focus on actionable professional development opportunities
 
 5. Test Results Analysis
-• Show how their type has evolved across different tests
-• Compare results from different test versions (8, 24, 100 questions)
-• Highlight their most consistent traits
+• Compare results across all tests taken (if multiple tests exist)
+• Identify consistent patterns and any variations in scores
+• Explain what their score trends might indicate about their type development
 
-6. Connection Guide
-• Provide practical tips for working with this personality type
-• Include communication preferences
-• Suggest effective collaboration strategies
+6. How Others Can Best Work With Them
+• Provide specific communication preferences based on their trait scores
+• Include collaboration strategies that leverage their strongest traits
+• Add practical tips for effective teamwork based on their type
 
-Keep the showcase:
-- Professional and evidence-based
-- Focused on practical applications
-- Free from storytelling or fictional elements
-- Based strictly on test results
-- Clear and actionable
-- Suitable for networking and professional contexts
+7. Final Summary for Self-Presentation
+Create a concise 1-2 sentence professional summary that captures their key traits and working style.
 
-Use bullet points for clarity and structure. Avoid using names or making assumptions about the individual. Focus on data-driven insights and practical applications.`;
+Important Guidelines:
+- Base all insights strictly on their test data and scores
+- Keep the tone professional yet engaging
+- Focus on practical workplace and personal development applications
+- Avoid any fictional elements or storytelling
+- Do not make assumptions about gender or personal characteristics
+- Use specific percentages and test results to support each point
+- Make the analysis unique to their individual score pattern
+- Ensure all content is suitable for professional networking
+
+The showcase should be data-driven, practical, and immediately useful for professional development and team collaboration.`;
 
     console.log('Generating personality showcase with Mistral AI...');
     
@@ -726,7 +731,7 @@ Use bullet points for clarity and structure. Avoid using names or making assumpt
       messages: [
         { 
           role: "system", 
-          content: "You are an expert MBTI analyst and personal branding consultant. Your job is to generate structured and engaging personality showcases based on test results. Focus on practical insights and professional applications. Avoid storytelling or fictional elements. Use clear, professional language." 
+          content: "You are an expert MBTI analyst and professional development consultant. Your role is to create highly personalized, data-driven personality analyses based on actual test results. Focus on practical workplace applications and professional development. Use clear, structured formatting with bullet points. Avoid any fictional elements or assumptions." 
         },
         { role: "user", content: prompt }
       ],
