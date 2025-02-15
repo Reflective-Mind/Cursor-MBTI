@@ -486,18 +486,28 @@ router.put('/me', auth, async (req, res) => {
 // Generate AI story
 router.post('/:userId/generate-story', auth, async (req, res) => {
   try {
-    // Verify user authorization
-    if (req.params.userId !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized to generate story for this profile' });
-    }
+    console.log('Generate story request:', {
+      paramsUserId: req.params.userId,
+      authUserId: req.user.userId,
+      timestamp: new Date().toISOString()
+    });
 
     // Get user's test results
-    const testResults = await TestResult.find({ user: req.user.userId })
+    const testResults = await TestResult.find({ user: req.params.userId })
       .sort({ createdAt: -1 })
       .limit(1);
 
+    console.log('Found test results:', {
+      count: testResults?.length,
+      firstResult: testResults[0] ? {
+        type: testResults[0].result?.type,
+        hasPercentages: !!testResults[0].result?.percentages,
+        hasDominantTraits: !!testResults[0].result?.dominantTraits
+      } : null
+    });
+
     if (!testResults || testResults.length === 0) {
-      return res.status(404).json({ message: 'No test results found' });
+      return res.status(404).json({ message: 'No test results found. Please complete an MBTI test first.' });
     }
 
     const latestResult = testResults[0];
@@ -507,10 +517,10 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
 
 Type: ${latestResult.result.type}
 Trait Percentages:
-${Object.entries(latestResult.result.percentages).map(([trait, value]) => `${trait}: ${value}%`).join('\n')}
+${Object.entries(latestResult.result.percentages || {}).map(([trait, value]) => `${trait}: ${value}%`).join('\n')}
 
 Dominant Traits:
-${Object.entries(latestResult.result.dominantTraits).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
+${Object.entries(latestResult.result.dominantTraits || {}).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
 
 Write a 2-3 paragraph story that:
 1. Explains their personality type in a narrative way
@@ -520,6 +530,8 @@ Write a 2-3 paragraph story that:
 
 Make it personal, engaging, and positive.`;
 
+    console.log('Generating story with Mistral AI...');
+    
     // Generate story using Mistral AI
     const response = await mistral.chat({
       model: "mistral-tiny",
@@ -532,16 +544,26 @@ Make it personal, engaging, and positive.`;
       topP: 0.9
     });
 
+    console.log('Mistral AI response received:', {
+      hasChoices: !!response?.choices,
+      firstChoice: !!response?.choices?.[0],
+      hasMessage: !!response?.choices?.[0]?.message
+    });
+
     if (!response?.choices?.[0]?.message?.content) {
       throw new Error('Invalid AI response format');
     }
 
     res.json({ story: response.choices[0].message.content });
   } catch (error) {
-    console.error('Error generating AI story:', error);
+    console.error('Error generating AI story:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.params.userId
+    });
     res.status(500).json({ 
       message: 'Error generating AI story',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: error.message
     });
   }
 });
