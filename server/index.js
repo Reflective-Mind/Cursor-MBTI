@@ -522,14 +522,7 @@ const logRoutes = (stack, prefix = '') => {
 // API routes with logging
 console.log('\nRegistering API routes...');
 
-const authRouter = require('./routes/auth');
-console.log('Loading auth routes...');
-app.use('/api/auth', authRouter);
-
-const usersRouter = require('./routes/users');
-console.log('Loading users routes...');
-app.use('/api/users', usersRouter);
-
+// Mount test-results router first
 console.log('Loading test-results routes...');
 try {
   console.log('Current directory:', process.cwd());
@@ -540,6 +533,17 @@ try {
   console.log('File exists:', require('fs').existsSync(routePath));
   
   const testResultsRouter = require(routePath);
+  
+  // Add test route directly to app
+  app.get('/api/test-results-health', (req, res) => {
+    res.json({
+      message: 'Test results router health check',
+      routerExists: !!testResultsRouter,
+      hasStack: !!testResultsRouter?.stack,
+      stackSize: testResultsRouter?.stack?.length || 0
+    });
+  });
+
   if (!testResultsRouter || !testResultsRouter.stack) {
     console.error('Test results router is invalid:', testResultsRouter);
     throw new Error('Invalid router');
@@ -559,10 +563,13 @@ try {
       }))
   });
 
-  app.use('/api/test-results', (req, res, next) => {
+  // Mount the router with logging middleware
+  const testResultsPath = '/api/test-results';
+  app.use(testResultsPath, (req, res, next) => {
     console.log('Test-results route accessed:', {
       method: req.method,
       path: req.path,
+      fullPath: testResultsPath + req.path,
       headers: req.headers,
       body: req.body,
       timestamp: new Date().toISOString()
@@ -570,7 +577,7 @@ try {
     next();
   }, testResultsRouter);
 
-  console.log('Test results router mounted successfully at /api/test-results');
+  console.log('Test results router mounted successfully at', testResultsPath);
 } catch (error) {
   console.error('Error loading test results router:', {
     error: {
@@ -584,6 +591,15 @@ try {
     moduleSearchPaths: module.paths
   });
 }
+
+// Mount other routers
+const authRouter = require('./routes/auth');
+console.log('Loading auth routes...');
+app.use('/api/auth', authRouter);
+
+const usersRouter = require('./routes/users');
+console.log('Loading users routes...');
+app.use('/api/users', usersRouter);
 
 const personalityRouter = require('./routes/personality');
 console.log('Loading personality routes...');
