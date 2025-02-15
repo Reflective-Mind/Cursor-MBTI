@@ -152,6 +152,18 @@ router.get('/ping', (req, res) => {
   res.json({ message: 'Test results router is working' });
 });
 
+// Test endpoint to verify router is working
+router.get('/test', (req, res) => {
+  console.log('GET /test endpoint accessed');
+  res.json({ 
+    message: 'Test results router test endpoint is working',
+    routes: router.stack.map(layer => ({
+      path: layer.route?.path,
+      methods: layer.route ? Object.keys(layer.route.methods) : undefined
+    })).filter(r => r.path)
+  });
+});
+
 // Log that the router is ready
 console.log('Test results router initialized with routes:', {
   routes: router.stack.map(layer => ({
