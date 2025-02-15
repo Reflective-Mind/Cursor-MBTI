@@ -568,4 +568,25 @@ Make it personal, engaging, and positive.`;
   }
 });
 
+// Add debug endpoint
+router.get('/debug', auth, async (req, res) => {
+  try {
+    const routes = router.stack
+      .filter(r => r.route)
+      .map(r => ({
+        path: r.route.path,
+        methods: Object.keys(r.route.methods)
+      }));
+
+    res.json({
+      message: 'Users router debug information',
+      routes,
+      userId: req.user.userId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router; 

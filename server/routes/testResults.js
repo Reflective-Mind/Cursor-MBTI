@@ -12,8 +12,8 @@ let openai;
 
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { Mistral } = require('@mistralai/mistralai');
-    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+    const { MistralAIClient } = require('@mistralai/mistralai');
+    mistral = new MistralAIClient(process.env.MISTRAL_API_KEY);
     console.log('Mistral AI client initialized');
   }
 } catch (error) {

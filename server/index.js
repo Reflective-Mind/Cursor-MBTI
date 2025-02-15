@@ -50,7 +50,14 @@ app.use((req, res, next) => {
     body: req.body,
     query: req.query,
     params: req.params,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    registeredRoutes: app._router?.stack
+      ?.filter(r => r.route || r.name === 'router')
+      ?.map(r => ({
+        type: r.name,
+        path: r.route?.path || (r.regexp?.toString().match(/^\/\^\\(.*?)\\\//)?.[1] || ''),
+        methods: r.route ? Object.keys(r.route.methods) : undefined
+      }))
   });
   next();
 });
