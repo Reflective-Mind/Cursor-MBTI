@@ -12,22 +12,22 @@ let openai;
 
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { MistralAIClient } = require('@mistralai/mistralai');
-    mistral = new MistralAIClient(process.env.MISTRAL_API_KEY);
-    console.log('Mistral AI client initialized');
+    const { Mistral } = require('@mistralai/mistralai');
+    mistral = new Mistral(process.env.MISTRAL_API_KEY);
+    console.log('Test Results Router: Mistral AI client initialized successfully');
   }
 } catch (error) {
-  console.warn('Failed to initialize Mistral AI client:', error.message);
+  console.warn('Test Results Router: Failed to initialize Mistral AI client:', error.message);
 }
 
 try {
   if (process.env.OPENAI_API_KEY) {
     const OpenAI = require('openai');
     openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    console.log('OpenAI client initialized');
+    console.log('Test Results Router: OpenAI client initialized');
   }
 } catch (error) {
-  console.warn('Failed to initialize OpenAI client:', error.message);
+  console.warn('Test Results Router: Failed to initialize OpenAI client:', error.message);
 }
 
 // Log middleware to track route access

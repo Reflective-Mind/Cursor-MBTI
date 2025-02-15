@@ -2,32 +2,20 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const TestResult = require('../models/TestResult');
-const { MistralAIClient } = require('@mistralai/mistralai');
 
-// Initialize Mistral AI client
+console.log('Initializing chat router');
+
+// Initialize Mistral client if API key is available
 let mistral;
-
-(async () => {
-  try {
-    console.log('Attempting to initialize Mistral AI client...');
-    
-    if (!process.env.MISTRAL_API_KEY) {
-      console.error('MISTRAL_API_KEY is not set in environment variables');
-      throw new Error('MISTRAL_API_KEY environment variable is not set');
-    }
-    
-    console.log('Creating Mistral client with API key:', process.env.MISTRAL_API_KEY.substring(0, 8) + '...');
-    mistral = new MistralAIClient(process.env.MISTRAL_API_KEY);
-    console.log('Chat: Mistral AI client initialized successfully');
-  } catch (error) {
-    console.error('Chat: Failed to initialize Mistral AI client:', {
-      error: error.message,
-      stack: error.stack,
-      apiKeyPresent: !!process.env.MISTRAL_API_KEY,
-      apiKeyLength: process.env.MISTRAL_API_KEY ? process.env.MISTRAL_API_KEY.length : 0
-    });
+try {
+  if (process.env.MISTRAL_API_KEY) {
+    const { Mistral } = require('@mistralai/mistralai');
+    mistral = new Mistral(process.env.MISTRAL_API_KEY);
+    console.log('Chat Router: Mistral AI client initialized successfully');
   }
-})();
+} catch (error) {
+  console.warn('Chat Router: Failed to initialize Mistral AI client:', error.message);
+}
 
 // Send message to chat
 router.post('/message', auth, async (req, res) => {

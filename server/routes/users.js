@@ -4,10 +4,20 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const TestResult = require('../models/TestResult');
-const { MistralAIClient } = require('@mistralai/mistralai');
 
-// Initialize Mistral AI client
-const mistral = new MistralAIClient(process.env.MISTRAL_API_KEY);
+console.log('Initializing users router');
+
+// Initialize Mistral client if API key is available
+let mistral;
+try {
+  if (process.env.MISTRAL_API_KEY) {
+    const { Mistral } = require('@mistralai/mistralai');
+    mistral = new Mistral(process.env.MISTRAL_API_KEY);
+    console.log('Users Router: Mistral AI client initialized successfully');
+  }
+} catch (error) {
+  console.warn('Users Router: Failed to initialize Mistral AI client:', error.message);
+}
 
 // Get current user's profile
 router.get('/me', auth, async (req, res) => {
