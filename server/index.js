@@ -2,19 +2,22 @@
 console.log('Current NODE_ENV:', process.env.NODE_ENV);
 console.log('Current directory:', process.cwd());
 
+const path = require('path');
+
 if (process.env.NODE_ENV === 'production') {
-  console.log('Loading production environment from:', './.env.production');
-  require('dotenv').config({ path: './.env.production' });
+  console.log('Loading production environment from:', path.join(__dirname, '.env.production'));
+  require('dotenv').config({ path: path.join(__dirname, '.env.production') });
 } else {
-  console.log('Loading development environment');
-  require('dotenv').config();
+  console.log('Loading development environment from:', path.join(__dirname, '.env'));
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
 console.log('Environment variables loaded:', {
   NODE_ENV: process.env.NODE_ENV,
   PORT: process.env.PORT,
   MONGODB_URI: process.env.MONGODB_URI ? 'Present' : 'Missing',
-  JWT_SECRET: process.env.JWT_SECRET ? 'Present' : 'Missing'
+  JWT_SECRET: process.env.JWT_SECRET ? 'Present' : 'Missing',
+  MISTRAL_API_KEY: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing'
 });
 
 const express = require('express');
@@ -693,7 +696,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 

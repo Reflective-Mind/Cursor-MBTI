@@ -1,7 +1,33 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { Mistral } = require('@mistralai/mistralai');
+const TestResult = require('../models/TestResult');
+const { MistralAIClient } = require('@mistralai/mistralai');
+
+// Initialize Mistral AI client
+let mistral;
+
+(async () => {
+  try {
+    console.log('Attempting to initialize Mistral AI client...');
+    
+    if (!process.env.MISTRAL_API_KEY) {
+      console.error('MISTRAL_API_KEY is not set in environment variables');
+      throw new Error('MISTRAL_API_KEY environment variable is not set');
+    }
+    
+    console.log('Creating Mistral client with API key:', process.env.MISTRAL_API_KEY.substring(0, 8) + '...');
+    mistral = new MistralAIClient(process.env.MISTRAL_API_KEY);
+    console.log('Chat: Mistral AI client initialized successfully');
+  } catch (error) {
+    console.error('Chat: Failed to initialize Mistral AI client:', {
+      error: error.message,
+      stack: error.stack,
+      apiKeyPresent: !!process.env.MISTRAL_API_KEY,
+      apiKeyLength: process.env.MISTRAL_API_KEY ? process.env.MISTRAL_API_KEY.length : 0
+    });
+  }
+})();
 
 // Send message to chat
 router.post('/message', auth, async (req, res) => {
@@ -21,7 +47,7 @@ router.post('/message', auth, async (req, res) => {
         lastMessage: req.body.messages?.[req.body.messages?.length - 1]?.content?.substring(0, 50)
       },
       env: {
-        apiKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing',
+        mistralKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing',
         nodeEnv: process.env.NODE_ENV
       },
       user: req.user ? {
@@ -34,21 +60,32 @@ router.post('/message', auth, async (req, res) => {
       return res.status(401).json({ message: 'Test 5 - Authentication required' });
     }
 
-    if (!process.env.MISTRAL_API_KEY) {
-      throw new Error('Test 5 - Mistral API key is missing');
+    if (!mistral) {
+      throw new Error('Test 5 - Mistral AI service not initialized');
     }
 
     if (!req.body.messages || !Array.isArray(req.body.messages)) {
       throw new Error('Test 5 - Invalid messages format');
     }
 
-    const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-    const model = "mistral-large-latest";
+    // Fetch user's test results
+    const testResults = await TestResult.find({ user: req.user.userId }).sort({ createdAt: -1 });
+    console.log('Test 5 - Retrieved test results:', {
+      count: testResults.length,
+      types: testResults.map(r => r.testCategory),
+      firstResult: testResults[0] ? {
+        id: testResults[0]._id,
+        type: testResults[0].result?.type,
+        percentages: testResults[0].result?.percentages,
+        dominantTraits: testResults[0].result?.dominantTraits,
+        answers: testResults[0].answers
+      } : null
+    });
 
     // Add system message if not present
     const messages = req.body.messages;
     if (!messages.find(msg => msg.role === 'system')) {
-      messages.unshift({
+      const systemMessage = {
         role: 'system',
         content: `You are a focused MBTI personality expert assistant. Your responses should be:
 1. Brief and to the point
@@ -67,31 +104,46 @@ router.post('/message', auth, async (req, res) => {
 8. If the question is unclear or ambiguous:
    - Request specific examples
    - Ask about the context
-   - Suggest MBTI-related aspects that might be relevant`
+   - Suggest MBTI-related aspects that might be relevant
+
+Current user's test results:
+${testResults.map(result => `
+Test Category: ${result.testCategory}
+Type: ${result.result?.type}
+Percentages: ${Object.entries(result.result?.percentages || {}).map(([key, value]) => `${key}: ${value}%`).join(', ')}
+Dominant Traits: ${Object.entries(result.result?.dominantTraits || {}).map(([key, value]) => `${key}: ${value}`).join(', ')}
+Answers: ${result.answers?.map(a => `Q: ${a.question} A: ${a.answer}`).join(' | ')}
+`).join('\n')}`
+      };
+      messages.unshift(systemMessage);
+      console.log('Test 5 - Added system message:', {
+        role: systemMessage.role,
+        contentLength: systemMessage.content.length,
+        testResultsIncluded: systemMessage.content.includes('Current user\'s test results'),
+        firstFewLines: systemMessage.content.split('\n').slice(0, 3).join('\n')
       });
     }
 
-    console.log('Test 5 - Making request to Mistral API:', {
-      model,
-      messageCount: messages.length,
-      apiKey: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing'
+    let response;
+    console.log('Test 5 - Using Mistral AI');
+    response = await mistral.chat({
+      model: "mistral-tiny",
+      messages: messages,
+      temperature: 0.7,
+      maxTokens: 150,
+      topP: 0.9
     });
+    
+    console.log('Test 5 - Raw Mistral response:', JSON.stringify(response, null, 2));
 
-    const response = await client.chat.complete({
-      model,
-      messages,
-      temperature: 0.5, // Lower temperature for more focused responses
-      max_tokens: 150, // Limit response length
-      top_p: 0.9
-    });
-
-    console.log('Test 5 - Mistral API response:', {
-      hasChoices: Boolean(response.choices),
-      firstChoice: response.choices?.[0]?.message?.content?.substring(0, 50)
-    });
-
-    if (!response.choices?.[0]?.message) {
-      throw new Error('Test 5 - Invalid response format from API');
+    if (!response?.choices?.[0]?.message) {
+      console.error('Test 5 - Invalid response format:', {
+        hasResponse: !!response,
+        hasChoices: !!response?.choices,
+        firstChoice: response?.choices?.[0],
+        message: response?.choices?.[0]?.message
+      });
+      throw new Error('Test 5 - Invalid response format from Mistral AI service');
     }
     
     res.status(200).json({

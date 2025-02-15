@@ -3,13 +3,32 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const TestResult = require('../models/TestResult');
 const User = require('../models/User');
-const OpenAI = require('openai');
 
 console.log('Initializing testResults router');
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize AI clients if API keys are available
+let mistral;
+let openai;
+
+try {
+  if (process.env.MISTRAL_API_KEY) {
+    const { Mistral } = require('@mistralai/mistralai');
+    mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+    console.log('Mistral AI client initialized');
+  }
+} catch (error) {
+  console.warn('Failed to initialize Mistral AI client:', error.message);
+}
+
+try {
+  if (process.env.OPENAI_API_KEY) {
+    const OpenAI = require('openai');
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    console.log('OpenAI client initialized');
+  }
+} catch (error) {
+  console.warn('Failed to initialize OpenAI client:', error.message);
+}
 
 // Log middleware to track route access
 router.use((req, res, next) => {
