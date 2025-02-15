@@ -63,13 +63,19 @@ const corsOptions = {
       'https://cursor-mbti.vercel.app',
       'http://localhost:3000',
       'https://mbti-render.onrender.com',
+      'https://cursor-mbti-git-master-reflective-mind.vercel.app',
+      'https://cursor-mbti.vercel.app',
+      'https://cursor-mbti-reflective-mind.vercel.app',
       undefined // Allow requests with no origin (like mobile apps or curl requests)
     ];
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('Origin not allowed:', origin);
+      console.log('Origin not allowed:', origin, {
+        allowedOrigins,
+        timestamp: new Date().toISOString()
+      });
       callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
