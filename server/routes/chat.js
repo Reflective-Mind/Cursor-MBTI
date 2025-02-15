@@ -9,9 +9,11 @@ console.log('Initializing chat router');
 let mistral;
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { MistralClient } = require('@mistralai/mistralai');
-    mistral = new MistralClient(process.env.MISTRAL_API_KEY);
+    const { Mistral } = require('@mistralai/mistralai');
+    mistral = new Mistral(process.env.MISTRAL_API_KEY);
     console.log('Chat Router: Mistral AI client initialized successfully');
+  } else {
+    console.warn('Chat Router: MISTRAL_API_KEY is not set in environment variables');
   }
 } catch (error) {
   console.warn('Chat Router: Failed to initialize Mistral AI client:', error.message);

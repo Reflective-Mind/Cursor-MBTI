@@ -12,12 +12,15 @@ if (process.env.NODE_ENV === 'production') {
   require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
+// Add detailed environment variable logging
 console.log('Environment variables loaded:', {
   NODE_ENV: process.env.NODE_ENV,
   PORT: process.env.PORT,
   MONGODB_URI: process.env.MONGODB_URI ? 'Present' : 'Missing',
   JWT_SECRET: process.env.JWT_SECRET ? 'Present' : 'Missing',
-  MISTRAL_API_KEY: process.env.MISTRAL_API_KEY ? 'Present' : 'Missing'
+  MISTRAL_API_KEY: process.env.MISTRAL_API_KEY ? `Present (length: ${process.env.MISTRAL_API_KEY.length})` : 'Missing',
+  ENV_FILE_PATH: path.join(__dirname, '.env'),
+  CURRENT_DIR: __dirname
 });
 
 const express = require('express');

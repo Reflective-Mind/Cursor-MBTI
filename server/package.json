@@ -12,8 +12,8 @@
     "prod": "cross-env NODE_ENV=production node ./index.js"
   },
   "dependencies": {
-    "@mistralai/mistralai": "^1.5.0",
-    "axios": "^1.6.7",
+    "@mistralai/mistralai": "^0.0.7",
+    "axios": "^1.7.9",
     "cors": "^2.8.5",
     "cross-env": "^7.0.3",
     "dotenv": "^16.0.3",
@@ -22,7 +22,6 @@
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.3",
     "morgan": "^1.10.0",
-    "openai": "^4.85.1",
     "socket.io": "^4.8.1"
   }
 }
