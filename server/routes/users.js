@@ -555,12 +555,12 @@ Make it personal, engaging, and positive.`;
     console.log('Generating story with Mistral AI...');
     
     // Generate story using Mistral AI
-    const response = await mistral.chatCompletions.create({
-      model: "mistral-tiny",
+    const response = await mistral.chat({
       messages: [
         { role: "system", content: "You are an expert MBTI analyst who writes engaging, personalized stories about people's personalities." },
         { role: "user", content: prompt }
       ],
+      model: "mistral-tiny",
       temperature: 0.7,
       max_tokens: 500,
       top_p: 0.9
