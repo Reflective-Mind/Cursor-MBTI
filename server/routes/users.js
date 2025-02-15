@@ -489,10 +489,16 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
     console.log('Generate story request:', {
       paramsUserId: req.params.userId,
       authUserId: req.user.userId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      headers: req.headers,
+      mistralInitialized: !!mistral
     });
 
-    // Get user's test results
+    // Get user's test results with detailed logging
+    console.log('Searching for test results with query:', {
+      user: req.params.userId
+    });
+
     const testResults = await TestResult.find({ user: req.params.userId })
       .sort({ createdAt: -1 })
       .limit(1);
@@ -500,14 +506,20 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
     console.log('Found test results:', {
       count: testResults?.length,
       firstResult: testResults[0] ? {
+        id: testResults[0]._id,
         type: testResults[0].result?.type,
         hasPercentages: !!testResults[0].result?.percentages,
-        hasDominantTraits: !!testResults[0].result?.dominantTraits
-      } : null
+        hasDominantTraits: !!testResults[0].result?.dominantTraits,
+        createdAt: testResults[0].createdAt
+      } : null,
+      query: { user: req.params.userId }
     });
 
     if (!testResults || testResults.length === 0) {
-      return res.status(404).json({ message: 'No test results found. Please complete an MBTI test first.' });
+      return res.status(404).json({ 
+        message: 'No test results found. Please complete an MBTI test first.',
+        userId: req.params.userId
+      });
     }
 
     const latestResult = testResults[0];
