@@ -601,25 +601,24 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
       throw error;
     }
 
-    // Get user's test results with detailed logging
+    // Get all user's test results with detailed logging
     console.log('Searching for test results with query:', {
       user: req.params.userId
     });
 
     const testResults = await TestResult.find({ user: req.params.userId })
-      .sort({ createdAt: -1 })
-      .limit(1);
+      .sort({ createdAt: -1 });
 
     console.log('Found test results:', {
       count: testResults?.length,
-      firstResult: testResults[0] ? {
-        id: testResults[0]._id,
-        type: testResults[0].result?.type,
-        hasPercentages: !!testResults[0].result?.percentages,
-        hasDominantTraits: !!testResults[0].result?.dominantTraits,
-        createdAt: testResults[0].createdAt
-      } : null,
-      query: { user: req.params.userId }
+      results: testResults.map(result => ({
+        id: result._id,
+        type: result.result?.type,
+        testCategory: result.testCategory,
+        hasPercentages: !!result.result?.percentages,
+        hasDominantTraits: !!result.result?.dominantTraits,
+        createdAt: result.createdAt
+      }))
     });
 
     if (!testResults || testResults.length === 0) {
@@ -629,37 +628,110 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
       });
     }
 
-    const latestResult = testResults[0];
-    
+    // Get user info for personalization
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Prepare test results summary
+    const testBreakdown = testResults.map(test => ({
+      category: test.testCategory,
+      type: test.result.type,
+      percentages: test.result.percentages,
+      dominantTraits: test.result.dominantTraits,
+      date: test.createdAt
+    }));
+
+    // Calculate average trait scores across all tests
+    const averageTraits = {
+      E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0,
+      count: testResults.length
+    };
+
+    testResults.forEach(test => {
+      if (test.result.percentages) {
+        Object.entries(test.result.percentages).forEach(([trait, value]) => {
+          averageTraits[trait] += value;
+        });
+      }
+    });
+
+    Object.keys(averageTraits).forEach(trait => {
+      if (trait !== 'count') {
+        averageTraits[trait] = Math.round(averageTraits[trait] / averageTraits.count);
+      }
+    });
+
     // Prepare the prompt for AI
-    const prompt = `Based on this MBTI test result, write a personalized story about the individual's personality:
+    const prompt = `Create a complete personality showcase based on these MBTI test results:
 
-Type: ${latestResult.result.type}
-Trait Percentages:
-${Object.entries(latestResult.result.percentages || {}).map(([trait, value]) => `${trait}: ${value}%`).join('\n')}
+Test History:
+${testBreakdown.map(test => `${test.category}: ${test.type} (Taken: ${new Date(test.date).toLocaleDateString()})`).join('\n')}
 
-Dominant Traits:
-${Object.entries(latestResult.result.dominantTraits || {}).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
+Average Trait Percentages:
+${Object.entries(averageTraits)
+  .filter(([key]) => key !== 'count')
+  .map(([trait, value]) => `${trait}: ${value}%`)
+  .join('\n')}
 
-Write a 2-3 paragraph story that:
-1. Explains their personality type in a narrative way
-2. Highlights their key strengths and potential areas for growth
-3. Suggests how they might interact with others and approach challenges
-4. Provides personalized advice for leveraging their personality traits
+Latest Test Dominant Traits:
+${Object.entries(testResults[0].result.dominantTraits || {}).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
 
-Make it personal, engaging, and positive.`;
+Create a structured personality showcase following this format:
 
-    console.log('Generating story with Mistral AI...');
+1. Profile Title
+"${testResults[0].result.type} - [Add descriptive title based on dominant traits]"
+
+2. Summary Introduction
+• Write 2-3 sentences summarizing their MBTI type based on all tests taken
+• Describe their core personality traits and how they process information
+• Keep it professional and engaging while remaining factual
+
+3. Key Personality Strengths
+• List 3-4 major strengths based on their highest scoring traits
+• Each strength should have a brief explanation
+• If any trait is balanced (close to 50%), mention that as a unique advantage
+
+4. Areas for Growth
+• List 2-3 development areas based on their test scores
+• Make suggestions constructive and actionable
+• Focus on professional and personal development opportunities
+
+5. Test Results Analysis
+• Show how their type has evolved across different tests
+• Compare results from different test versions (8, 24, 100 questions)
+• Highlight their most consistent traits
+
+6. Connection Guide
+• Provide practical tips for working with this personality type
+• Include communication preferences
+• Suggest effective collaboration strategies
+
+Keep the showcase:
+- Professional and evidence-based
+- Focused on practical applications
+- Free from storytelling or fictional elements
+- Based strictly on test results
+- Clear and actionable
+- Suitable for networking and professional contexts
+
+Use bullet points for clarity and structure. Avoid using names or making assumptions about the individual. Focus on data-driven insights and practical applications.`;
+
+    console.log('Generating personality showcase with Mistral AI...');
     
-    // Generate story using Mistral AI
+    // Generate analysis using Mistral AI
     const response = await mistralClient.chat({
       model: "mistral-tiny",
       messages: [
-        { role: "system", content: "You are an expert MBTI analyst who writes engaging, personalized stories about people's personalities." },
+        { 
+          role: "system", 
+          content: "You are an expert MBTI analyst and personal branding consultant. Your job is to generate structured and engaging personality showcases based on test results. Focus on practical insights and professional applications. Avoid storytelling or fictional elements. Use clear, professional language." 
+        },
         { role: "user", content: prompt }
       ],
-      temperature: 0.7,
-      max_tokens: 500,
+      temperature: 0.5,
+      max_tokens: 1500,
       top_p: 0.9
     });
 
@@ -675,12 +747,6 @@ Make it personal, engaging, and positive.`;
 
     const story = response.choices[0].message.content;
 
-    // Get the user to update their profile
-    const user = await User.findById(req.params.userId);
-    if (!user) {
-      throw new Error('User not found');
-    }
-
     // Check if AI Analysis section already exists
     let aiSection = user.profileSections.find(section => section.type === 'ai_analysis');
     
@@ -688,7 +754,7 @@ Make it personal, engaging, and positive.`;
       // Update existing section
       aiSection.content = [{
         id: new mongoose.Types.ObjectId().toString(),
-        title: 'Your Personality Story',
+        title: `${testResults[0].result.type} Personality Showcase`,
         description: story,
         contentType: 'text'
       }];
@@ -696,13 +762,13 @@ Make it personal, engaging, and positive.`;
       // Create new section
       aiSection = {
         id: new mongoose.Types.ObjectId().toString(),
-        title: 'AI Personality Analysis',
+        title: `${testResults[0].result.type} Personality Showcase`,
         order: user.profileSections.length,
         isVisible: true,
         type: 'ai_analysis',
         content: [{
           id: new mongoose.Types.ObjectId().toString(),
-          title: 'Your Personality Story',
+          title: `${testResults[0].result.type} Personality Showcase`,
           description: story,
           contentType: 'text'
         }]
@@ -711,23 +777,30 @@ Make it personal, engaging, and positive.`;
     }
 
     await user.save();
-    console.log('AI story saved to profile:', {
+    console.log('Personality showcase saved to profile:', {
       sectionId: aiSection.id,
-      contentLength: story.length
+      contentLength: story.length,
+      type: testResults[0].result.type,
+      testCount: testResults.length
     });
 
     res.json({ 
       story,
-      section: aiSection
+      section: aiSection,
+      testBreakdown: testBreakdown.map(test => ({
+        category: test.category,
+        type: test.type,
+        date: test.date
+      }))
     });
   } catch (error) {
-    console.error('Error generating AI story:', {
+    console.error('Error generating personality showcase:', {
       error: error.message,
       stack: error.stack,
       userId: req.params.userId
     });
     res.status(500).json({ 
-      message: 'Error generating AI story',
+      message: 'Error generating personality showcase',
       details: error.message
     });
   }
