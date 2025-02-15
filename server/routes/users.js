@@ -673,7 +673,53 @@ Make it personal, engaging, and positive.`;
       throw new Error('Invalid AI response format');
     }
 
-    res.json({ story: response.choices[0].message.content });
+    const story = response.choices[0].message.content;
+
+    // Get the user to update their profile
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Check if AI Analysis section already exists
+    let aiSection = user.profileSections.find(section => section.type === 'ai_analysis');
+    
+    if (aiSection) {
+      // Update existing section
+      aiSection.content = [{
+        id: new mongoose.Types.ObjectId().toString(),
+        title: 'Your Personality Story',
+        description: story,
+        contentType: 'text'
+      }];
+    } else {
+      // Create new section
+      aiSection = {
+        id: new mongoose.Types.ObjectId().toString(),
+        title: 'AI Personality Analysis',
+        order: user.profileSections.length,
+        isVisible: true,
+        type: 'ai_analysis',
+        content: [{
+          id: new mongoose.Types.ObjectId().toString(),
+          title: 'Your Personality Story',
+          description: story,
+          contentType: 'text'
+        }]
+      };
+      user.profileSections.push(aiSection);
+    }
+
+    await user.save();
+    console.log('AI story saved to profile:', {
+      sectionId: aiSection.id,
+      contentLength: story.length
+    });
+
+    res.json({ 
+      story,
+      section: aiSection
+    });
   } catch (error) {
     console.error('Error generating AI story:', {
       error: error.message,

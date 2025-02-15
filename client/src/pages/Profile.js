@@ -428,29 +428,7 @@ const Profile = () => {
 
       const data = await response.json();
       
-      // Create a new section with the AI story
-      const storyResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${profile._id}/sections`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title: 'AI Personality Analysis',
-          type: 'ai_analysis',
-          content: [{
-            title: 'Your Personality Story',
-            description: data.story,
-            contentType: 'text'
-          }]
-        })
-      });
-
-      if (!storyResponse.ok) {
-        throw new Error('Failed to save AI story');
-      }
-
-      // Refresh profile to show new section
+      // Refresh profile to show the new/updated AI story section
       await fetchProfile();
       setError(null);
     } catch (error) {

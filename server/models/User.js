@@ -120,7 +120,7 @@ const userSchema = new mongoose.Schema({
     },
     type: {
       type: String,
-      enum: ['default', 'custom'],
+      enum: ['default', 'custom', 'ai_analysis'],
       default: 'custom'
     },
     content: [{
