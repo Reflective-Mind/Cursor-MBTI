@@ -33,6 +33,25 @@ const Message = require('./models/Message');
 const app = express();
 const server = http.createServer(app);
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log('Incoming request:', {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? 'Present' : 'Missing',
+      'origin': req.headers.origin
+    },
+    body: req.body,
+    query: req.query,
+    params: req.params,
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -436,20 +455,138 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'MBTI Server is running',
     env: process.env.NODE_ENV,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    routes: app._router.stack
+      .filter(r => r.route)
+      .map(r => ({
+        path: r.route.path,
+        methods: Object.keys(r.route.methods)
+      }))
   });
 });
 
-// API routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/test-results', require('./routes/testResults'));
-app.use('/api/personality', require('./routes/personality'));
-app.use('/api/insights', require('./routes/insights'));
-app.use('/api/chat', require('./routes/chat'));
-app.use('/api/community', require('./routes/community'));
+// Test route to verify routing is working
+app.get('/api/test', (req, res) => {
+  res.json({
+    message: 'Test route is working',
+    routes: app._router.stack
+      .filter(r => r.name === 'router')
+      .map(r => ({
+        regexp: r.regexp.toString(),
+        path: r.regexp.toString().match(/^\/\^\\(.*?)\\\//)?.[1] || '',
+        handle: {
+          name: r.handle.name,
+          stack: r.handle.stack.map(layer => ({
+            name: layer.name,
+            route: layer.route ? {
+              path: layer.route.path,
+              methods: Object.keys(layer.route.methods)
+            } : undefined
+          }))
+        }
+      }))
+  });
+});
 
-// Error handling middleware
+// Direct test route for test-results
+app.post('/api/test-results-direct', (req, res) => {
+  console.log('Direct test-results route hit:', {
+    method: req.method,
+    headers: req.headers,
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+  res.json({
+    message: 'Direct test-results route is working',
+    receivedData: {
+      headers: req.headers,
+      body: req.body
+    }
+  });
+});
+
+// Log registered routes
+const logRoutes = (stack, prefix = '') => {
+  stack.forEach(layer => {
+    if (layer.route) {
+      const methods = Object.keys(layer.route.methods);
+      console.log(`Route registered: [${methods.join(', ')}] ${prefix}${layer.route.path}`);
+    } else if (layer.name === 'router') {
+      const newPrefix = prefix + (layer.regexp.toString().match(/^\/\^\\(.*?)\\\//)?.[1] || '');
+      console.log(`Router mounted at: ${newPrefix}`);
+      logRoutes(layer.handle.stack, newPrefix);
+    }
+  });
+};
+
+// API routes with logging
+console.log('\nRegistering API routes...');
+
+const authRouter = require('./routes/auth');
+console.log('Loading auth routes...');
+app.use('/api/auth', authRouter);
+
+const usersRouter = require('./routes/users');
+console.log('Loading users routes...');
+app.use('/api/users', usersRouter);
+
+console.log('Loading test-results routes...');
+const testResultsRouter = require('./routes/testResults');
+app.use('/api/test-results', testResultsRouter);
+
+const personalityRouter = require('./routes/personality');
+console.log('Loading personality routes...');
+app.use('/api/personality', personalityRouter);
+
+const insightsRouter = require('./routes/insights');
+console.log('Loading insights routes...');
+app.use('/api/insights', insightsRouter);
+
+const chatRouter = require('./routes/chat');
+console.log('Loading chat routes...');
+app.use('/api/chat', chatRouter);
+
+const communityRouter = require('./routes/community');
+console.log('Loading community routes...');
+app.use('/api/community', communityRouter);
+
+// Log all registered routes
+console.log('\nRegistered routes:');
+logRoutes(app._router.stack);
+
+// Catch-all route for debugging
+app.use('*', (req, res) => {
+  console.log('404 - Route not found:', {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    headers: req.headers,
+    params: req.params,
+    query: req.query,
+    body: req.body,
+    timestamp: new Date().toISOString(),
+    registeredRoutes: app._router.stack
+      .filter(r => r.route || r.name === 'router')
+      .map(r => ({
+        type: r.name,
+        path: r.route?.path || (r.regexp?.toString().match(/^\/\^\\(.*?)\\\//)?.[1] || ''),
+        methods: r.route ? Object.keys(r.route.methods) : undefined
+      }))
+  });
+  res.status(404).json({
+    message: 'Route not found',
+    requestedPath: req.path,
+    availableRoutes: app._router.stack
+      .filter(r => r.route || r.name === 'router')
+      .map(r => ({
+        type: r.name,
+        path: r.route?.path || (r.regexp?.toString().match(/^\/\^\\(.*?)\\\//)?.[1] || ''),
+        methods: r.route ? Object.keys(r.route.methods) : undefined
+      }))
+  });
+});
+
+// Enhanced error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', {
     message: err.message,
@@ -457,11 +594,16 @@ app.use((err, req, res, next) => {
     headers: req.headers,
     method: req.method,
     url: req.url,
+    path: req.path,
     origin: req.headers.origin,
+    body: req.body,
+    query: req.query,
+    params: req.params,
     env: {
       NODE_ENV: process.env.NODE_ENV,
       PORT: process.env.PORT
-    }
+    },
+    timestamp: new Date().toISOString()
   });
 
   if (err.message.includes('CORS')) {
@@ -475,7 +617,9 @@ app.use((err, req, res, next) => {
 
   res.status(500).json({
     message: 'Something went wrong!',
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    path: req.path,
+    method: req.method
   });
 });
 

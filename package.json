@@ -13,7 +13,8 @@
     "install-server": "cd server && npm install",
     "install-client": "cd client && npm install",
     "build-client": "cd client && npm run build",
-    "postinstall": "npm run install-server"
+    "postinstall": "npm run install-server",
+    "deploy": "git add . && git commit -m \"Deploy updates\" && git push origin main"
   },
   "dependencies": {
     "axios": "^1.6.7",

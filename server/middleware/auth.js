@@ -1,24 +1,48 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+console.log('Initializing auth middleware');
+
 const auth = async (req, res, next) => {
+  console.log('Auth middleware started:', {
+    path: req.path,
+    method: req.method,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'authorization': req.headers['authorization'] ? 'Present' : 'Missing'
+    },
+    timestamp: new Date().toISOString()
+  });
+
   try {
     // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      throw new Error();
+      console.log('No token provided');
+      return res.status(401).json({ message: 'Authentication required' });
     }
+
+    console.log('Token received, verifying...');
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
+    console.log('Token verified, finding user:', {
+      userId: decoded.userId
+    });
+
     // Find user
     const user = await User.findById(decoded.userId);
     
     if (!user) {
-      throw new Error();
+      console.log('User not found:', {
+        userId: decoded.userId
+      });
+      return res.status(401).json({ message: 'User not found' });
     }
+
+    console.log('User found, updating last active');
 
     // Update last active timestamp
     user.lastActive = new Date();
@@ -27,10 +51,34 @@ const auth = async (req, res, next) => {
     // Add user info to request
     req.user = decoded;
     req.token = token;
+
+    console.log('Auth middleware completed successfully:', {
+      userId: decoded.userId,
+      path: req.path,
+      method: req.method
+    });
     
     next();
   } catch (error) {
-    res.status(401).json({ message: 'Please authenticate' });
+    console.error('Auth middleware error:', {
+      error: {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      },
+      path: req.path,
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired' });
+    }
+    
+    res.status(401).json({ message: 'Authentication failed' });
   }
 };
 
