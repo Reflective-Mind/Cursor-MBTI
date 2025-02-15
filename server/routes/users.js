@@ -580,6 +580,50 @@ Make it personal, engaging, and positive.`;
   }
 });
 
+// Debug endpoint for story generation
+router.get('/debug/story/:userId', auth, async (req, res) => {
+  try {
+    console.log('Debug story generation for user:', req.params.userId);
+    
+    // Check Mistral client
+    console.log('Mistral client status:', {
+      initialized: !!mistral,
+      hasApiKey: !!process.env.MISTRAL_API_KEY
+    });
+    
+    // Get test results
+    const testResults = await TestResult.find({ user: req.params.userId })
+      .sort({ createdAt: -1 })
+      .limit(1);
+      
+    console.log('Test results found:', {
+      count: testResults?.length,
+      result: testResults[0] ? {
+        id: testResults[0]._id,
+        type: testResults[0].result?.type,
+        percentages: testResults[0].result?.percentages,
+        dominantTraits: testResults[0].result?.dominantTraits
+      } : null
+    });
+    
+    res.json({
+      mistralStatus: {
+        initialized: !!mistral,
+        hasApiKey: !!process.env.MISTRAL_API_KEY
+      },
+      testResults: testResults[0] ? {
+        id: testResults[0]._id,
+        type: testResults[0].result?.type,
+        hasPercentages: !!testResults[0].result?.percentages,
+        hasDominantTraits: !!testResults[0].result?.dominantTraits
+      } : null
+    });
+  } catch (error) {
+    console.error('Error in story generation debug:', error);
+    res.status(500).json({ message: 'Error in story generation debug' });
+  }
+});
+
 // Add debug endpoint
 router.get('/debug', auth, async (req, res) => {
   try {

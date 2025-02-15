@@ -183,6 +183,41 @@ router.get('/test', (req, res) => {
   });
 });
 
+// Debug endpoint to check test results
+router.get('/debug/results/:userId', auth, async (req, res) => {
+  try {
+    console.log('Checking test results for user:', req.params.userId);
+    
+    const results = await TestResult.find({ user: req.params.userId })
+      .sort({ createdAt: -1 });
+    
+    console.log('Found results:', {
+      count: results.length,
+      results: results.map(r => ({
+        id: r._id,
+        category: r.testCategory,
+        type: r.result?.type,
+        createdAt: r.createdAt
+      }))
+    });
+    
+    res.json({
+      count: results.length,
+      results: results.map(r => ({
+        id: r._id,
+        category: r.testCategory,
+        type: r.result?.type,
+        createdAt: r.createdAt,
+        hasPercentages: !!r.result?.percentages,
+        hasDominantTraits: !!r.result?.dominantTraits
+      }))
+    });
+  } catch (error) {
+    console.error('Error checking test results:', error);
+    res.status(500).json({ message: 'Error checking test results' });
+  }
+});
+
 // Log that the router is ready
 console.log('Test results router initialized with routes:', {
   routes: router.stack.map(layer => ({
