@@ -4,6 +4,10 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const TestResult = require('../models/TestResult');
+const { MistralAIClient } = require('@mistralai/mistralai');
+
+// Initialize Mistral AI client
+const mistral = new MistralAIClient(process.env.MISTRAL_API_KEY);
 
 // Get current user's profile
 router.get('/me', auth, async (req, res) => {
@@ -476,6 +480,69 @@ router.put('/me', auth, async (req, res) => {
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Generate AI story
+router.post('/:userId/generate-story', auth, async (req, res) => {
+  try {
+    // Verify user authorization
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized to generate story for this profile' });
+    }
+
+    // Get user's test results
+    const testResults = await TestResult.find({ user: req.user.userId })
+      .sort({ createdAt: -1 })
+      .limit(1);
+
+    if (!testResults || testResults.length === 0) {
+      return res.status(404).json({ message: 'No test results found' });
+    }
+
+    const latestResult = testResults[0];
+    
+    // Prepare the prompt for AI
+    const prompt = `Based on this MBTI test result, write a personalized story about the individual's personality:
+
+Type: ${latestResult.result.type}
+Trait Percentages:
+${Object.entries(latestResult.result.percentages).map(([trait, value]) => `${trait}: ${value}%`).join('\n')}
+
+Dominant Traits:
+${Object.entries(latestResult.result.dominantTraits).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
+
+Write a 2-3 paragraph story that:
+1. Explains their personality type in a narrative way
+2. Highlights their key strengths and potential areas for growth
+3. Suggests how they might interact with others and approach challenges
+4. Provides personalized advice for leveraging their personality traits
+
+Make it personal, engaging, and positive.`;
+
+    // Generate story using Mistral AI
+    const response = await mistral.chat({
+      model: "mistral-tiny",
+      messages: [
+        { role: "system", content: "You are an expert MBTI analyst who writes engaging, personalized stories about people's personalities." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7,
+      maxTokens: 500,
+      topP: 0.9
+    });
+
+    if (!response?.choices?.[0]?.message?.content) {
+      throw new Error('Invalid AI response format');
+    }
+
+    res.json({ story: response.choices[0].message.content });
+  } catch (error) {
+    console.error('Error generating AI story:', error);
+    res.status(500).json({ 
+      message: 'Error generating AI story',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
