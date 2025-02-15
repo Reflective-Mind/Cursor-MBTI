@@ -531,8 +531,31 @@ console.log('Loading users routes...');
 app.use('/api/users', usersRouter);
 
 console.log('Loading test-results routes...');
-const testResultsRouter = require('./routes/testResults');
-app.use('/api/test-results', testResultsRouter);
+try {
+  const testResultsRouter = require('./routes/testResults');
+  if (!testResultsRouter || !testResultsRouter.stack) {
+    console.error('Test results router is invalid:', testResultsRouter);
+    throw new Error('Invalid router');
+  }
+  console.log('Test results router loaded successfully:', {
+    routes: testResultsRouter.stack
+      .filter(layer => layer.route)
+      .map(layer => ({
+        path: layer.route.path,
+        methods: Object.keys(layer.route.methods)
+      }))
+  });
+  app.use('/api/test-results', testResultsRouter);
+} catch (error) {
+  console.error('Error loading test results router:', {
+    error: {
+      message: error.message,
+      stack: error.stack
+    },
+    cwd: process.cwd(),
+    files: require('fs').readdirSync('./routes')
+  });
+}
 
 const personalityRouter = require('./routes/personality');
 console.log('Loading personality routes...');
