@@ -532,7 +532,14 @@ app.use('/api/users', usersRouter);
 
 console.log('Loading test-results routes...');
 try {
-  const testResultsRouter = require('./routes/testResults');
+  console.log('Current directory:', process.cwd());
+  console.log('Available files in routes:', require('fs').readdirSync('./routes'));
+  
+  const routePath = './routes/testResults.js';
+  console.log('Attempting to require:', routePath);
+  console.log('File exists:', require('fs').existsSync(routePath));
+  
+  const testResultsRouter = require(routePath);
   if (!testResultsRouter || !testResultsRouter.stack) {
     console.error('Test results router is invalid:', testResultsRouter);
     throw new Error('Invalid router');
