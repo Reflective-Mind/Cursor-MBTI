@@ -505,6 +505,59 @@ app.post('/api/test-results-direct', (req, res) => {
   });
 });
 
+// Test routes for debugging
+app.get('/api/debug/routes', (req, res) => {
+  const routes = app._router.stack
+    .filter(r => r.route || r.name === 'router')
+    .map(r => ({
+      type: r.name,
+      path: r.route?.path || (r.regexp?.toString().match(/^\/\^\\(.*?)\\\//)?.[1] || ''),
+      methods: r.route ? Object.keys(r.route.methods) : undefined,
+      stack: r.handle?.stack?.length || r.stack?.length
+    }));
+
+  res.json({
+    message: 'Debug route information',
+    routes,
+    env: process.env.NODE_ENV,
+    cwd: process.cwd(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/debug/test-results', (req, res) => {
+  try {
+    const routePath = './routes/testResults.js';
+    const exists = require('fs').existsSync(routePath);
+    const router = exists ? require(routePath) : null;
+
+    res.json({
+      message: 'Test results router debug information',
+      fileExists: exists,
+      routerLoaded: !!router,
+      hasStack: !!router?.stack,
+      stackSize: router?.stack?.length || 0,
+      routes: router?.stack
+        ?.filter(layer => layer.route)
+        .map(layer => ({
+          path: layer.route.path,
+          methods: Object.keys(layer.route.methods)
+        })) || [],
+      cwd: process.cwd(),
+      nodeEnv: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error getting test results router information',
+      error: {
+        message: error.message,
+        name: error.name
+      }
+    });
+  }
+});
+
 // Log registered routes
 const logRoutes = (stack, prefix = '') => {
   stack.forEach(layer => {
@@ -522,103 +575,46 @@ const logRoutes = (stack, prefix = '') => {
 // API routes with logging
 console.log('\nRegistering API routes...');
 
-// Mount test-results router first
-console.log('Loading test-results routes...');
-try {
-  console.log('Current directory:', process.cwd());
-  console.log('Available files in routes:', require('fs').readdirSync('./routes'));
-  
-  const routePath = './routes/testResults.js';
-  console.log('Attempting to require:', routePath);
-  console.log('File exists:', require('fs').existsSync(routePath));
-  
-  const testResultsRouter = require(routePath);
-  
-  // Add test route directly to app
-  app.get('/api/test-results-health', (req, res) => {
-    res.json({
-      message: 'Test results router health check',
-      routerExists: !!testResultsRouter,
-      hasStack: !!testResultsRouter?.stack,
-      stackSize: testResultsRouter?.stack?.length || 0
-    });
-  });
-
-  if (!testResultsRouter || !testResultsRouter.stack) {
-    console.error('Test results router is invalid:', testResultsRouter);
-    throw new Error('Invalid router');
-  }
-
-  // Add detailed logging
-  console.log('Test results router details:', {
-    isRouter: testResultsRouter instanceof require('express').Router,
-    hasStack: Boolean(testResultsRouter.stack),
-    stackSize: testResultsRouter.stack?.length,
-    routes: testResultsRouter.stack
-      ?.filter(layer => layer.route)
-      .map(layer => ({
-        path: layer.route.path,
-        methods: Object.keys(layer.route.methods),
-        middleware: layer.route.stack.map(s => s.name || 'anonymous')
-      }))
-  });
-
-  // Mount the router with logging middleware
-  const testResultsPath = '/api/test-results';
-  app.use(testResultsPath, (req, res, next) => {
-    console.log('Test-results route accessed:', {
-      method: req.method,
-      path: req.path,
-      fullPath: testResultsPath + req.path,
-      headers: req.headers,
-      body: req.body,
-      timestamp: new Date().toISOString()
-    });
-    next();
-  }, testResultsRouter);
-
-  console.log('Test results router mounted successfully at', testResultsPath);
-} catch (error) {
-  console.error('Error loading test results router:', {
-    error: {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    },
-    cwd: process.cwd(),
-    files: require('fs').readdirSync('./routes'),
-    nodeEnv: process.env.NODE_ENV,
-    moduleSearchPaths: module.paths
-  });
-}
-
-// Mount other routers
+// Import routers
+const testResultsRouter = require('./routes/testResults');
 const authRouter = require('./routes/auth');
-console.log('Loading auth routes...');
-app.use('/api/auth', authRouter);
-
 const usersRouter = require('./routes/users');
-console.log('Loading users routes...');
-app.use('/api/users', usersRouter);
-
 const personalityRouter = require('./routes/personality');
-console.log('Loading personality routes...');
-app.use('/api/personality', personalityRouter);
-
 const insightsRouter = require('./routes/insights');
-console.log('Loading insights routes...');
-app.use('/api/insights', insightsRouter);
-
 const chatRouter = require('./routes/chat');
-console.log('Loading chat routes...');
-app.use('/api/chat', chatRouter);
-
 const communityRouter = require('./routes/community');
-console.log('Loading community routes...');
+
+// Debug route to check router status
+app.get('/api/debug/status', (req, res) => {
+  res.json({
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+    routers: {
+      testResults: !!testResultsRouter,
+      auth: !!authRouter,
+      users: !!usersRouter,
+      personality: !!personalityRouter,
+      insights: !!insightsRouter,
+      chat: !!chatRouter,
+      community: !!communityRouter
+    }
+  });
+});
+
+// Mount routers with explicit logging
+console.log('Mounting test-results router...');
+app.use('/api/test-results', testResultsRouter);
+
+console.log('Mounting other routers...');
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/personality', personalityRouter);
+app.use('/api/insights', insightsRouter);
+app.use('/api/chat', chatRouter);
 app.use('/api/community', communityRouter);
 
-// Log all registered routes
-console.log('\nRegistered routes:');
+// Log all registered routes after mounting
+console.log('All routes mounted. Registered routes:');
 logRoutes(app._router.stack);
 
 // Catch-all route for debugging
