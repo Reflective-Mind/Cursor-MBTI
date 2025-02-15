@@ -537,23 +537,44 @@ try {
     console.error('Test results router is invalid:', testResultsRouter);
     throw new Error('Invalid router');
   }
-  console.log('Test results router loaded successfully:', {
+
+  // Add detailed logging
+  console.log('Test results router details:', {
+    isRouter: testResultsRouter instanceof require('express').Router,
+    hasStack: Boolean(testResultsRouter.stack),
+    stackSize: testResultsRouter.stack?.length,
     routes: testResultsRouter.stack
-      .filter(layer => layer.route)
+      ?.filter(layer => layer.route)
       .map(layer => ({
         path: layer.route.path,
-        methods: Object.keys(layer.route.methods)
+        methods: Object.keys(layer.route.methods),
+        middleware: layer.route.stack.map(s => s.name || 'anonymous')
       }))
   });
-  app.use('/api/test-results', testResultsRouter);
+
+  app.use('/api/test-results', (req, res, next) => {
+    console.log('Test-results route accessed:', {
+      method: req.method,
+      path: req.path,
+      headers: req.headers,
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
+    next();
+  }, testResultsRouter);
+
+  console.log('Test results router mounted successfully at /api/test-results');
 } catch (error) {
   console.error('Error loading test results router:', {
     error: {
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
+      name: error.name
     },
     cwd: process.cwd(),
-    files: require('fs').readdirSync('./routes')
+    files: require('fs').readdirSync('./routes'),
+    nodeEnv: process.env.NODE_ENV,
+    moduleSearchPaths: module.paths
   });
 }
 
