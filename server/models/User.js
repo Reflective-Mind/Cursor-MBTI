@@ -248,7 +248,7 @@ userSchema.methods.getProfileSections = async function() {
     personality: {
       id: 'personality',
       title: weightedResult ? 
-        `${weightedResult.type} - ${weightedResult.profileTitle.split(' - ')[1]}` :
+        weightedResult.profileTitle :
         `${this.mbtiType || 'Unknown'} - Take the MBTI Test`,
       type: 'default',
       content: [
@@ -368,7 +368,7 @@ function generatePersonalityOverview(weightedResult) {
       .map(t => t.name);
 
     if (balancedTraits.length > 0) {
-      return `Your test results show balanced preferences in ${balancedTraits.join(', ')}. To get a more definitive type assessment, consider taking the comprehensive MBTI-100 test which provides the most accurate results.`;
+      return `Based on your test results, you show balanced preferences in ${balancedTraits.join(', ')}. For a more definitive assessment of these traits, we recommend taking the comprehensive MBTI-100 test, which provides the most detailed and accurate analysis of your personality type.`;
     }
   }
 
@@ -383,7 +383,7 @@ function generatePersonalityOverview(weightedResult) {
     .sort((a, b) => b.strength - a.strength)
     .slice(0, 2);
 
-  return `Based on your weighted test results, you show a ${weightedResult.type} personality type. Your strongest traits are ${strongestTraits[0].trait} (${strongestTraits[0].score}% preference) and ${strongestTraits[1].trait} (${strongestTraits[1].score}% preference). This combination creates a unique perspective that influences how you interact with the world, make decisions, and process information.`;
+  return `Your personality assessment reveals a ${weightedResult.type} type, with particularly strong preferences in ${strongestTraits[0].trait} (${strongestTraits[0].score}%) and ${strongestTraits[1].trait} (${strongestTraits[1].score}%). This combination of traits shapes your unique approach to processing information, making decisions, and interacting with others. Your test results have been weighted based on test comprehensiveness, with longer tests contributing more significantly to your final type determination.`;
 }
 
 // Helper function to format trait strengths
@@ -399,7 +399,9 @@ function formatTraitStrengths(weightedResult) {
 ${trait.name}:
 ${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
 Preference Strength: ${trait.strength}%
-${trait.strength <= 15 ? '(Consider taking MBTI-100 for clearer preference)' : `(Clear ${trait.eScore > trait.iScore ? trait.e : trait.i} preference)`}
+${trait.strength <= 15 ? 
+  '(Consider taking the MBTI-100 test for a more definitive assessment of this trait)' : 
+  `(Strong ${trait.eScore > trait.iScore ? trait.e : trait.i} preference)`}
   `).join('\n\n');
 }
 
@@ -418,10 +420,10 @@ function formatTestDetails(test) {
   return `
 Test Type: ${test.category.toUpperCase()}
 Result: ${test.type}
-Weight: ${test.weight}% contribution to final type
+Contribution: ${test.weight}% of final type determination
 Date Taken: ${date}
 
-Trait Percentages:
+Detailed Trait Percentages:
 ${percentages}
   `.trim();
 }
@@ -431,9 +433,9 @@ function formatTestBreakdown(weightedResult) {
   const testContributions = weightedResult.testBreakdown
     .map(test => `
 ${test.category.toUpperCase()}:
-• Type: ${test.type}
-• Weight: ${test.weight}% contribution
-• Date: ${new Date(test.date).toLocaleDateString('en-US', {
+• Result: ${test.type}
+• Weight: ${test.weight}% of final type
+• Taken: ${new Date(test.date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -441,14 +443,17 @@ ${test.category.toUpperCase()}:
     .join('\n\n');
 
   return `
-Your personality type is calculated using a weighted average of your test results, with longer tests having more influence on the final type determination.
+Your MBTI personality type is determined using a weighted calculation system that prioritizes more comprehensive tests:
+• MBTI-100: 100% base weight
+• MBTI-24: 24% base weight
+• MBTI-8: 8% base weight
 
-Test Contribution Breakdown:
+Your Test History and Contributions:
 ${testContributions}
 
 ${weightedResult.isBalanced ? 
-  '\nNote: Some of your preferences show balanced scores. Consider taking the MBTI-100 test for a more definitive assessment.' : 
-  '\nYour preferences show clear distinctions across all dimensions.'}
+  '\nNote: Your results show some balanced preferences. For a more definitive assessment, consider taking the MBTI-100 test, which provides the most comprehensive analysis of your personality type.' : 
+  '\nYour test results show clear preferences across all dimensions, providing a reliable indication of your personality type.'}
   `.trim();
 }
 

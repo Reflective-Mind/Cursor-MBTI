@@ -94,9 +94,9 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     const weight = this.TEST_WEIGHTS[result.testCategory];
     weightedScores.totalWeight += weight;
 
-    // Apply weight to each trait score with emphasis on test category
+    // Apply weight to each trait score with stronger emphasis on test category
     Object.entries(result.result.percentages).forEach(([trait, value]) => {
-      weightedScores[trait] += value * weight * (1 + weight); // Increase influence of higher weighted tests
+      weightedScores[trait] += value * weight * (1 + weight * 2); // Increase influence of higher weighted tests
     });
   });
 
@@ -113,7 +113,7 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     
     if (total > 0) {
       // Calculate normalized scores with weighted bias
-      const weightedBias = Math.min(0.1, weightedScores.totalWeight * 0.05); // Add slight bias based on total weight
+      const weightedBias = Math.min(0.15, weightedScores.totalWeight * 0.1); // Increased bias based on total weight
       const rawScore1 = (score1 / total);
       normalizedScores[trait1] = Math.round((rawScore1 + (rawScore1 > 0.5 ? weightedBias : -weightedBias)) * 100);
       normalizedScores[trait2] = 100 - normalizedScores[trait1];
@@ -135,7 +135,7 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
   // Adjust minimum strength threshold based on test weights
   const MINIMUM_STRENGTH_THRESHOLD = Math.max(
     15,  // Base threshold
-    weightedScores.totalWeight * 8  // Weighted threshold adjustment
+    weightedScores.totalWeight * 10  // Increased weighted threshold adjustment
   );
 
   // Determine final type based on normalized scores
