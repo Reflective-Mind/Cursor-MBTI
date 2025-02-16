@@ -247,15 +247,17 @@ userSchema.methods.getProfileSections = async function() {
   const defaultSections = {
     personality: {
       id: 'personality',
-      title: `${this.mbtiType} - ${getPersonalityTitle(this.mbtiType)}`,
+      title: weightedResult ? 
+        weightedResult.profileTitle :
+        `${this.mbtiType || 'Unknown'} - Take the MBTI Test`,
       type: 'default',
       content: [
         {
           id: 'overview',
           title: 'MBTI Personality Overview',
           description: weightedResult ? 
-            `Based on your test results, you are predominantly ${this.mbtiType}. Your personality type combines ${weightedResult.dominantTraits.attitude}, ${weightedResult.dominantTraits.perception}, ${weightedResult.dominantTraits.judgment}, and ${weightedResult.dominantTraits.lifestyle} traits, creating a unique perspective on the world.` :
-            `Your personality type is ${this.mbtiType}. Take more MBTI tests to get a detailed analysis of your personality traits.`,
+            generatePersonalityOverview(weightedResult) :
+            'Take the MBTI test to discover your personality type and receive a detailed analysis of your traits.',
           contentType: 'text'
         },
         ...(weightedResult ? [{
@@ -264,19 +266,18 @@ userSchema.methods.getProfileSections = async function() {
           description: formatTestBreakdown(weightedResult),
           contentType: 'text'
         }] : []),
+        ...(weightedResult ? [{
+          id: 'trait-strengths',
+          title: 'Trait Strength Analysis',
+          description: formatTraitStrengths(weightedResult),
+          contentType: 'text'
+        }] : []),
         ...(weightedResult ? weightedResult.testBreakdown.map((test, index) => ({
           id: `test-${index}`,
-          title: `${test.category.toUpperCase()} Test Details`,
-          description: `Type: ${test.type}\nWeight: ${test.weight}%\nDate: ${new Date(test.date).toLocaleDateString()}\nTrait Percentages: ${Object.entries(test.percentages).map(([trait, value]) => `${trait}: ${value}%`).join(', ')}`,
+          title: `${test.category.toUpperCase()} Test Results`,
+          description: formatTestDetails(test),
           contentType: 'text'
-        })) : []),
-        ...this.personalityTraits.map((trait, index) => ({
-          id: `trait-${index}`,
-          title: trait.trait,
-          value: trait.strength,
-          description: `${trait.trait} Strength: ${trait.strength}%`,
-          contentType: 'progress'
-        }))
+        })) : [])
       ]
     },
     interests: {
@@ -352,8 +353,28 @@ function getPersonalityTitle(mbtiType) {
   return titles[mbtiType] || 'Personality Type';
 }
 
-// Helper function to format test breakdown
-function formatTestBreakdown(weightedResult) {
+// Helper function to generate personality overview
+function generatePersonalityOverview(weightedResult) {
+  if (weightedResult.isBalanced) {
+    return `Your test results show balanced preferences in some areas. This means you may exhibit flexibility in your approach to different situations. To get a more definitive type assessment, consider taking the comprehensive MBTI-100 test.`;
+  }
+
+  const traits = [
+    { name: 'Extroversion-Introversion', trait: weightedResult.dominantTraits.attitude, strength: weightedResult.traitStrengths.EI },
+    { name: 'Sensing-Intuition', trait: weightedResult.dominantTraits.perception, strength: weightedResult.traitStrengths.SN },
+    { name: 'Thinking-Feeling', trait: weightedResult.dominantTraits.judgment, strength: weightedResult.traitStrengths.TF },
+    { name: 'Judging-Perceiving', trait: weightedResult.dominantTraits.lifestyle, strength: weightedResult.traitStrengths.JP }
+  ];
+
+  const strongestTraits = traits
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, 2);
+
+  return `Based on your weighted test results, you show a clear preference for ${weightedResult.type}. Your strongest traits are ${strongestTraits[0].trait} (${strongestTraits[0].strength}% preference) and ${strongestTraits[1].trait} (${strongestTraits[1].strength}% preference). This combination creates a unique perspective that influences how you interact with the world, make decisions, and process information.`;
+}
+
+// Helper function to format trait strengths
+function formatTraitStrengths(weightedResult) {
   const traits = [
     { name: 'Extroversion-Introversion', e: 'E', i: 'I', eScore: weightedResult.percentages.E, iScore: weightedResult.percentages.I, strength: weightedResult.traitStrengths.EI },
     { name: 'Sensing-Intuition', e: 'S', i: 'N', eScore: weightedResult.percentages.S, iScore: weightedResult.percentages.N, strength: weightedResult.traitStrengths.SN },
@@ -361,25 +382,60 @@ function formatTestBreakdown(weightedResult) {
     { name: 'Judging-Perceiving', e: 'J', i: 'P', eScore: weightedResult.percentages.J, iScore: weightedResult.percentages.P, strength: weightedResult.traitStrengths.JP }
   ];
 
-  const testContributions = weightedResult.testBreakdown
-    .sort((a, b) => b.weight - a.weight)
-    .map(test => `${test.category.toUpperCase()}: ${test.type} (${test.weight}% contribution)`)
+  return traits.map(trait => `
+${trait.name}:
+${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
+Preference Strength: ${trait.strength}%
+${trait.strength <= 10 ? '(Balanced preference)' : `(Clear ${trait.eScore > trait.iScore ? trait.e : trait.i} preference)`}
+  `).join('\n\n');
+}
+
+// Helper function to format test details
+function formatTestDetails(test) {
+  const date = new Date(test.date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const percentages = Object.entries(test.percentages)
+    .map(([trait, value]) => `${trait}: ${value}%`)
     .join('\n');
 
   return `
-Your personality type is calculated using a weighted average of your test results:
+Test Type: ${test.category.toUpperCase()}
+Result: ${test.type}
+Weight: ${test.weight}% contribution to final type
+Date Taken: ${date}
 
-Test Contributions:
+Trait Percentages:
+${percentages}
+  `.trim();
+}
+
+// Helper function to format test breakdown
+function formatTestBreakdown(weightedResult) {
+  const testContributions = weightedResult.testBreakdown
+    .map(test => `
+${test.category.toUpperCase()}:
+• Type: ${test.type}
+• Weight: ${test.weight}% contribution
+• Date: ${new Date(test.date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}`)
+    .join('\n\n');
+
+  return `
+Your personality type is calculated using a weighted average of your test results, with longer tests having more influence on the final type determination.
+
+Test Contribution Breakdown:
 ${testContributions}
 
-Trait Analysis:
-${traits.map(trait => `
-${trait.name}:
-${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
-Dominant: ${trait.eScore > trait.iScore ? trait.e : trait.i} (Strength: ${trait.strength}%)
-`).join('\n')}
-
-This weighted calculation ensures that longer, more comprehensive tests have a greater influence on your final type determination.
+${weightedResult.isBalanced ? 
+  '\nNote: Some of your preferences show balanced scores. Consider taking the MBTI-100 test for a more definitive assessment.' : 
+  '\nYour preferences show clear distinctions across all dimensions.'}
   `.trim();
 }
 
