@@ -59,22 +59,23 @@ const testResultSchema = new mongoose.Schema({
   }
 });
 
-// Weight factors for different test types
+// Exact weight factors for different test types
 testResultSchema.statics.TEST_WEIGHTS = {
   'mbti-100': 1.0,    // 100% weight for comprehensive test
-  'mbti-24': 0.24,    // 24% weight for standard test
+  'mbti-24': 0.24,    // 24% weight for medium test
   'mbti-8': 0.08      // 8% weight for quick test
 };
 
 // Calculate weighted personality type from multiple test results
 testResultSchema.statics.calculateWeightedType = async function(userId) {
+  // Get all test results for the user, sorted by most recent first
   const results = await this.find({ user: userId }).sort({ createdAt: -1 });
   
   if (!results || results.length === 0) {
     return null;
   }
 
-  // Group results by test category (keep only latest of each type)
+  // Keep only the latest result for each test category
   const latestByCategory = {};
   results.forEach(result => {
     if (!latestByCategory[result.testCategory] || 
@@ -83,13 +84,13 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     }
   });
 
-  // Initialize weighted scores with proper weighting
+  // Initialize weighted scores with exact precision
   const weightedScores = {
     E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0,
     totalWeight: 0
   };
 
-  // Calculate weighted scores using proper test weights
+  // Calculate weighted scores using precise test weights
   Object.values(latestByCategory).forEach(result => {
     const weight = this.TEST_WEIGHTS[result.testCategory];
     weightedScores.totalWeight += weight;
@@ -100,29 +101,27 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     });
   });
 
-  // Normalize scores for each dichotomy pair
-  const normalizedScores = {
-    E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0
-  };
-
-  // Calculate normalized scores with proper weighting
-  [['E', 'I'], ['S', 'N'], ['T', 'F'], ['J', 'P']].forEach(([trait1, trait2]) => {
+  // Calculate final normalized scores for each trait
+  const normalizedScores = {};
+  const traitPairs = [['E', 'I'], ['S', 'N'], ['T', 'F'], ['J', 'P']];
+  
+  traitPairs.forEach(([trait1, trait2]) => {
     const score1 = weightedScores[trait1];
     const score2 = weightedScores[trait2];
     const total = score1 + score2;
     
     if (total > 0) {
-      // Calculate exact normalized scores without bias
+      // Calculate exact percentages
       normalizedScores[trait1] = Math.round((score1 / total) * 100);
       normalizedScores[trait2] = Math.round((score2 / total) * 100);
     } else {
-      // Only use 50-50 if absolutely no data
+      // Default to 50-50 only if no data exists
       normalizedScores[trait1] = 50;
       normalizedScores[trait2] = 50;
     }
   });
 
-  // Calculate trait strengths based on normalized scores
+  // Calculate precise trait strengths
   const traitStrengths = {
     EI: Math.abs(normalizedScores.E - normalizedScores.I),
     SN: Math.abs(normalizedScores.S - normalizedScores.N),
@@ -130,8 +129,8 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     JP: Math.abs(normalizedScores.J - normalizedScores.P)
   };
 
-  // Use strict threshold for balanced traits
-  const MINIMUM_STRENGTH_THRESHOLD = 15;
+  // Use 15% threshold for balanced trait determination
+  const BALANCED_THRESHOLD = 15;
 
   // Determine final type based on normalized scores
   const finalType = [
@@ -144,34 +143,31 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
   // Calculate exact test contributions
   const testContributions = Object.values(latestByCategory).map(r => ({
     category: r.testCategory,
-    weight: Math.round((this.TEST_WEIGHTS[r.testCategory] / weightedScores.totalWeight) * 100),
     type: r.result.type,
+    baseWeight: this.TEST_WEIGHTS[r.testCategory] * 100, // Show as percentage
+    effectiveWeight: Math.round((this.TEST_WEIGHTS[r.testCategory] / weightedScores.totalWeight) * 100),
     date: r.createdAt,
-    percentages: r.result.percentages,
-    baseWeight: this.TEST_WEIGHTS[r.testCategory] * 100
-  })).sort((a, b) => b.weight - a.weight);
+    percentages: r.result.percentages
+  })).sort((a, b) => b.effectiveWeight - a.effectiveWeight);
 
-  // Get personality title
-  const getPersonalityTitle = (type) => {
-    const titles = {
-      'INTJ': 'Architect - Strategic & Analytical Mastermind',
-      'INTP': 'Logician - Innovative Problem Solver',
-      'ENTJ': 'Commander - Dynamic & Strategic Leader',
-      'ENTP': 'Debater - Innovative & Versatile Thinker',
-      'INFJ': 'Counselor - Insightful & Empathetic Guide',
-      'INFP': 'Mediator - Creative & Authentic Idealist',
-      'ENFJ': 'Teacher - Charismatic & Inspiring Leader',
-      'ENFP': 'Champion - Enthusiastic & Creative Catalyst',
-      'ISTJ': 'Inspector - Reliable & Systematic Organizer',
-      'ISFJ': 'Protector - Dedicated & Nurturing Guardian',
-      'ESTJ': 'Supervisor - Efficient & Practical Manager',
-      'ESFJ': 'Provider - Supportive & Social Harmonizer',
-      'ISTP': 'Craftsperson - Skilled & Adaptable Problem-Solver',
-      'ISFP': 'Composer - Artistic & Compassionate Creator',
-      'ESTP': 'Dynamo - Energetic & Practical Doer',
-      'ESFP': 'Performer - Spontaneous & Engaging Entertainer'
-    };
-    return titles[type] || 'Personality Type';
+  // Get detailed personality title
+  const personalityTitles = {
+    'INTJ': 'Architect - Strategic & Analytical Mastermind',
+    'INTP': 'Logician - Innovative Problem Solver',
+    'ENTJ': 'Commander - Dynamic & Strategic Leader',
+    'ENTP': 'Debater - Innovative & Versatile Thinker',
+    'INFJ': 'Counselor - Insightful & Empathetic Guide',
+    'INFP': 'Mediator - Creative & Authentic Idealist',
+    'ENFJ': 'Teacher - Charismatic & Inspiring Leader',
+    'ENFP': 'Champion - Enthusiastic & Creative Catalyst',
+    'ISTJ': 'Inspector - Reliable & Systematic Organizer',
+    'ISFJ': 'Protector - Dedicated & Nurturing Guardian',
+    'ESTJ': 'Supervisor - Efficient & Practical Manager',
+    'ESFJ': 'Provider - Supportive & Social Harmonizer',
+    'ISTP': 'Craftsperson - Skilled & Adaptable Problem-Solver',
+    'ISFP': 'Composer - Artistic & Compassionate Creator',
+    'ESTP': 'Dynamo - Energetic & Practical Doer',
+    'ESFP': 'Performer - Spontaneous & Engaging Entertainer'
   };
 
   return {
@@ -185,12 +181,12 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     },
     traitStrengths,
     testBreakdown: testContributions,
-    isBalanced: Object.values(traitStrengths).some(strength => strength <= MINIMUM_STRENGTH_THRESHOLD),
-    profileTitle: `${finalType} - ${getPersonalityTitle(finalType)}`
+    isBalanced: Object.values(traitStrengths).some(strength => strength <= BALANCED_THRESHOLD),
+    profileTitle: `${finalType} - ${personalityTitles[finalType] || 'Personality Type'}`
   };
 };
 
-// Update the updatedAt timestamp before saving
+// Update timestamp before saving
 testResultSchema.pre('save', function(next) {
   this.updatedAt = new Date();
   next();

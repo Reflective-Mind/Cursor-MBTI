@@ -5,25 +5,33 @@ const TestResult = require('../models/TestResult');
 
 console.log('Initializing chat router');
 
-// Replace require with dynamic import
-let MistralClient;
-(async () => {
-  const { default: { MistralClient: Client } } = await import('@mistralai/mistralai');
-  MistralClient = Client;
-})().catch(console.error);
+// Initialize AI clients if API keys are available
+let mistralClient;
+let openai;
 
-// Initialize Mistral client if API key is available
-let mistral;
-try {
-  if (process.env.MISTRAL_API_KEY) {
-    mistral = new MistralClient(process.env.MISTRAL_API_KEY);
-    console.log('Chat Router: Mistral AI client initialized successfully');
-  } else {
-    console.warn('Chat Router: MISTRAL_API_KEY is not set in environment variables');
+(async () => {
+  try {
+    if (process.env.MISTRAL_API_KEY) {
+      const mistralModule = await import('@mistralai/mistralai/src/client.js');
+      mistralClient = new mistralModule.default(process.env.MISTRAL_API_KEY);
+      console.log('Chat Router: Mistral AI client initialized successfully');
+    } else {
+      console.warn('Chat Router: MISTRAL_API_KEY is not set in environment variables');
+    }
+  } catch (error) {
+    console.warn('Chat Router: Failed to initialize Mistral AI client:', error.message);
   }
-} catch (error) {
-  console.warn('Chat Router: Failed to initialize Mistral AI client:', error.message);
-}
+
+  try {
+    if (process.env.OPENAI_API_KEY) {
+      const OpenAI = require('openai');
+      openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      console.log('Chat Router: OpenAI client initialized');
+    }
+  } catch (error) {
+    console.warn('Chat Router: Failed to initialize OpenAI client:', error.message);
+  }
+})();
 
 // Send message to chat
 router.post('/message', auth, async (req, res) => {
@@ -56,7 +64,7 @@ router.post('/message', auth, async (req, res) => {
       return res.status(401).json({ message: 'Test 5 - Authentication required' });
     }
 
-    if (!mistral) {
+    if (!mistralClient) {
       throw new Error('Test 5 - Mistral AI service not initialized');
     }
 
@@ -122,7 +130,7 @@ Answers: ${result.answers?.map(a => `Q: ${a.question} A: ${a.answer}`).join(' | 
 
     let response;
     console.log('Test 5 - Using Mistral AI');
-    response = await mistral.chatCompletions.create({
+    response = await mistralClient.chat({
       model: "mistral-tiny",
       messages: messages,
       temperature: 0.7,

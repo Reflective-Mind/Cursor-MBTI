@@ -111,30 +111,17 @@ const userSchema = new mongoose.Schema({
     }
   },
   profileSections: [{
-    id: String,
     title: String,
+    content: String,
+    type: {
+      type: String,
+      enum: ['personality', 'interests', 'languages', 'achievements', 'custom']
+    },
     order: Number,
     isVisible: {
       type: Boolean,
       default: true
-    },
-    type: {
-      type: String,
-      enum: ['default', 'custom', 'ai_analysis'],
-      default: 'custom'
-    },
-    content: [{
-      id: String,
-      title: String,
-      order: Number,
-      description: String,
-      value: mongoose.Schema.Types.Mixed,
-      contentType: {
-        type: String,
-        enum: ['text', 'list', 'progress', 'link', 'date'],
-        default: 'text'
-      }
-    }]
+    }
   }],
   defaultSections: {
     personality: {
@@ -239,225 +226,120 @@ userSchema.methods.getPublicProfile = function() {
   };
 };
 
-// Add method to get profile sections
-userSchema.methods.getProfileSections = async function() {
+// Method to get profile sections
+userSchema.methods.getProfileSections = async function(weightedResult) {
   const TestResult = mongoose.model('TestResult');
-  const weightedResult = await TestResult.calculateWeightedType(this._id);
+  
+  // If no weighted result provided, calculate it
+  if (!weightedResult) {
+    weightedResult = await TestResult.calculateWeightedType(this._id);
+  }
 
+  // Define default sections with proper structure
   const defaultSections = {
     personality: {
       id: 'personality',
-      title: weightedResult ? 
-        weightedResult.profileTitle :
-        `${this.mbtiType || 'Unknown'} - Take the MBTI Test`,
+      title: weightedResult ? weightedResult.profileTitle : 'Personality Profile',
       type: 'default',
       content: [
         {
           id: 'overview',
-          title: 'MBTI Personality Overview',
-          description: weightedResult ? 
-            generatePersonalityOverview(weightedResult) :
-            'Take the MBTI test to discover your personality type and receive a detailed analysis of your traits.',
+          title: 'Personality Overview',
+          description: weightedResult ? generatePersonalityOverview(weightedResult) : 'Take a personality test to see your results',
           contentType: 'text'
         },
-        ...(weightedResult ? [{
-          id: 'test-breakdown',
-          title: 'Test Results Analysis',
-          description: formatTestBreakdown(weightedResult),
-          contentType: 'text'
-        }] : []),
-        ...(weightedResult ? [{
+        {
           id: 'trait-strengths',
-          title: 'Trait Strength Analysis',
-          description: formatTraitStrengths(weightedResult),
-          contentType: 'text'
-        }] : []),
-        ...(weightedResult ? weightedResult.testBreakdown.map((test, index) => ({
-          id: `test-${index}`,
-          title: `${test.category.toUpperCase()} Test Results`,
-          description: formatTestDetails(test),
-          contentType: 'text'
-        })) : [])
-      ]
-    },
-    interests: {
-      id: 'interests',
-      title: 'Interests & Activities',
-      type: 'default',
-      content: this.interests.map((interest, index) => ({
-        id: `interest-${index}`,
-        title: interest,
-        contentType: 'text'
-      }))
-    },
-    languages: {
-      id: 'languages',
-      title: 'Language Proficiency',
-      type: 'default',
-      content: this.languages.map((lang, index) => ({
-        id: `lang-${index}`,
-        title: lang.name,
-        value: lang.proficiency,
-        contentType: 'text'
-      }))
-    },
-    achievements: {
-      id: 'achievements',
-      title: 'Achievements & Milestones',
-      type: 'default',
-      content: this.achievements.map((achievement, index) => ({
-        id: `achievement-${index}`,
-        title: achievement.title,
-        description: achievement.description,
-        value: achievement.date,
-        contentType: 'date'
-      }))
+          title: 'Trait Strengths',
+          description: weightedResult ? formatTraitStrengths(weightedResult) : null,
+          contentType: 'traits'
+        },
+        {
+          id: 'test-breakdown',
+          title: 'Test Results Breakdown',
+          description: weightedResult ? formatTestBreakdown(weightedResult) : null,
+          contentType: 'breakdown'
+        }
+      ],
+      order: this.defaultSections.personality.order,
+      isVisible: this.defaultSections.personality.isVisible
     }
   };
 
-  // Combine default and custom sections, respecting visibility and order
-  const allSections = [
-    ...Object.entries(defaultSections)
-      .filter(([key]) => this.defaultSections[key]?.isVisible)
-      .map(([key, section]) => ({
-        ...section,
-        order: this.defaultSections[key].order
-      })),
-    ...this.profileSections
-      .filter(section => section.isVisible)
-  ].sort((a, b) => a.order - b.order);
-
-  return allSections;
+  return defaultSections;
 };
 
-// Helper function to get personality type title
-function getPersonalityTitle(mbtiType) {
-  const titles = {
-    'INTJ': 'Architect - Strategic & Analytical Mastermind',
-    'INTP': 'Logician - Innovative Problem Solver',
-    'ENTJ': 'Commander - Dynamic & Strategic Leader',
-    'ENTP': 'Debater - Innovative & Versatile Thinker',
-    'INFJ': 'Counselor - Insightful & Empathetic Guide',
-    'INFP': 'Mediator - Creative & Authentic Idealist',
-    'ENFJ': 'Teacher - Charismatic & Inspiring Leader',
-    'ENFP': 'Champion - Enthusiastic & Creative Catalyst',
-    'ISTJ': 'Inspector - Reliable & Systematic Organizer',
-    'ISFJ': 'Protector - Dedicated & Nurturing Guardian',
-    'ESTJ': 'Supervisor - Efficient & Practical Manager',
-    'ESFJ': 'Provider - Supportive & Social Harmonizer',
-    'ISTP': 'Craftsperson - Skilled & Adaptable Problem-Solver',
-    'ISFP': 'Composer - Artistic & Compassionate Creator',
-    'ESTP': 'Dynamo - Energetic & Practical Doer',
-    'ESFP': 'Performer - Spontaneous & Engaging Entertainer'
-  };
-  return titles[mbtiType] || 'Personality Type';
-}
-
-// Helper function to generate personality overview
 function generatePersonalityOverview(weightedResult) {
-  const traits = [
-    { name: 'Extroversion-Introversion', trait: weightedResult.dominantTraits.attitude, strength: weightedResult.traitStrengths.EI, score: weightedResult.percentages[weightedResult.type[0]] },
-    { name: 'Sensing-Intuition', trait: weightedResult.dominantTraits.perception, strength: weightedResult.traitStrengths.SN, score: weightedResult.percentages[weightedResult.type[1]] },
-    { name: 'Thinking-Feeling', trait: weightedResult.dominantTraits.judgment, strength: weightedResult.traitStrengths.TF, score: weightedResult.percentages[weightedResult.type[2]] },
-    { name: 'Judging-Perceiving', trait: weightedResult.dominantTraits.lifestyle, strength: weightedResult.traitStrengths.JP, score: weightedResult.percentages[weightedResult.type[3]] }
-  ];
+  const { type, dominantTraits, percentages, isBalanced } = weightedResult;
+  
+  // Get personality descriptions
+  const descriptions = {
+    E: 'Extroverted - Energized by social interaction',
+    I: 'Introverted - Energized by solitary activities',
+    S: 'Sensing - Focuses on concrete facts and details',
+    N: 'Intuitive - Focuses on patterns and possibilities',
+    T: 'Thinking - Makes decisions based on logic',
+    F: 'Feeling - Makes decisions based on values',
+    J: 'Judging - Prefers structure and planning',
+    P: 'Perceiving - Prefers flexibility and spontaneity'
+  };
 
-  const strongestTraits = traits
-    .sort((a, b) => b.strength - a.strength)
-    .slice(0, 2);
-
-  const balancedTraits = traits.filter(t => t.strength <= 15);
-
-  if (balancedTraits.length > 0) {
-    const balancedDescription = balancedTraits
-      .map(t => `${t.name} (${t.score}% vs ${100 - t.score}%)`)
-      .join(', ');
-
-    return `Your personality assessment shows balanced preferences in ${balancedDescription}. For a more definitive assessment of these traits, we recommend taking the MBTI-100 test, which provides the most comprehensive analysis. Your other traits show clear preferences, particularly in ${strongestTraits[0].trait} (${strongestTraits[0].score}%) and ${strongestTraits[1].trait} (${strongestTraits[1].score}%).`;
-  }
-
-  return `Your personality assessment reveals a clear ${weightedResult.type} type, with particularly strong preferences in ${strongestTraits[0].trait} (${strongestTraits[0].score}%) and ${strongestTraits[1].trait} (${strongestTraits[1].score}%). This combination of traits shapes your unique approach to processing information, making decisions, and interacting with others. Your results are based on a weighted calculation system that emphasizes comprehensive test results.`;
-}
-
-// Helper function to format trait strengths
-function formatTraitStrengths(weightedResult) {
-  const traits = [
-    { name: 'Extroversion-Introversion', e: 'E', i: 'I', eScore: weightedResult.percentages.E, iScore: weightedResult.percentages.I, strength: weightedResult.traitStrengths.EI },
-    { name: 'Sensing-Intuition', e: 'S', i: 'N', eScore: weightedResult.percentages.S, iScore: weightedResult.percentages.N, strength: weightedResult.traitStrengths.SN },
-    { name: 'Thinking-Feeling', e: 'T', i: 'F', eScore: weightedResult.percentages.T, iScore: weightedResult.percentages.F, strength: weightedResult.traitStrengths.TF },
-    { name: 'Judging-Perceiving', e: 'J', i: 'P', eScore: weightedResult.percentages.J, iScore: weightedResult.percentages.P, strength: weightedResult.traitStrengths.JP }
-  ];
-
-  return traits.map(trait => `
-${trait.name}:
-${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
-Preference Strength: ${trait.strength}%
-${trait.strength <= 15 ? 
-  `This dimension shows balanced preferences. Consider taking the MBTI-100 test for a more detailed analysis.` : 
-  `Strong ${trait.eScore > trait.iScore ? trait.e : trait.i} preference (${Math.max(trait.eScore, trait.iScore)}%)`}
-  `).join('\n\n');
-}
-
-// Helper function to format test details
-function formatTestDetails(test) {
-  const date = new Date(test.date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  // Generate overview text
+  let overview = `Based on your weighted test results, you are ${isBalanced ? 'a balanced' : 'primarily'} ${type} personality type.\n\n`;
+  overview += 'Your dominant traits are:\n';
+  
+  // Add dominant traits with percentages
+  Object.entries(dominantTraits).forEach(([category, trait]) => {
+    const traitLetter = trait[0];
+    const percentage = percentages[traitLetter];
+    overview += `• ${descriptions[traitLetter]} (${percentage}%)\n`;
   });
 
-  const percentages = Object.entries(test.percentages)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([trait, value]) => `${trait}: ${value}%`)
-    .join('\n');
-
-  return `
-Test Type: ${test.category.toUpperCase()}
-Base Weight: ${test.baseWeight}%
-Actual Contribution: ${test.weight}% of final type
-Result: ${test.type}
-Date Taken: ${date}
-
-Detailed Trait Percentages:
-${percentages}
-  `.trim();
+  return overview;
 }
 
-// Helper function to format test breakdown
+function formatTraitStrengths(weightedResult) {
+  const { traitStrengths, percentages } = weightedResult;
+  
+  return {
+    pairs: [
+      {
+        trait1: { letter: 'E', score: percentages.E },
+        trait2: { letter: 'I', score: percentages.I },
+        strength: traitStrengths.EI
+      },
+      {
+        trait1: { letter: 'S', score: percentages.S },
+        trait2: { letter: 'N', score: percentages.N },
+        strength: traitStrengths.SN
+      },
+      {
+        trait1: { letter: 'T', score: percentages.T },
+        trait2: { letter: 'F', score: percentages.F },
+        strength: traitStrengths.TF
+      },
+      {
+        trait1: { letter: 'J', score: percentages.J },
+        trait2: { letter: 'P', score: percentages.P },
+        strength: traitStrengths.JP
+      }
+    ]
+  };
+}
+
 function formatTestBreakdown(weightedResult) {
-  const testContributions = weightedResult.testBreakdown
-    .map(test => `
-${test.category.toUpperCase()}:
-• Type Result: ${test.type}
-• Base Weight: ${test.baseWeight}%
-• Actual Contribution: ${test.weight}%
-• Date Taken: ${new Date(test.date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })}
-• Trait Percentages:
-${Object.entries(test.percentages)
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([trait, value]) => `  - ${trait}: ${value}%`)
-  .join('\n')}`)
-    .join('\n\n');
-
-  return `
-Your MBTI personality type is determined using a weighted calculation system that prioritizes comprehensive tests:
-
-Test Weight System:
-• MBTI-100: 100% base weight
-• MBTI-24: 24% base weight
-• MBTI-8: 8% base weight
-
-Your Test History and Contributions:
-${testContributions}
-
-${weightedResult.isBalanced ? 
-  '\nNote: Your results show some balanced preferences. For a more definitive assessment, consider taking the MBTI-100 test, which provides the most comprehensive analysis of your personality type.' : 
-  '\nYour test results show clear preferences across all dimensions, providing a reliable indication of your personality type.'}
-  `.trim();
+  const { testBreakdown } = weightedResult;
+  
+  return {
+    tests: testBreakdown.map(test => ({
+      category: test.category,
+      type: test.type,
+      baseWeight: test.baseWeight,
+      effectiveWeight: test.effectiveWeight,
+      date: test.date,
+      percentages: test.percentages
+    }))
+  };
 }
 
 const User = mongoose.model('User', userSchema);

@@ -3,35 +3,37 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const TestResult = require('../models/TestResult');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 console.log('Initializing testResults router');
 
 // Initialize AI clients if API keys are available
-let mistral;
+let mistralClient;
 let openai;
-let MistralClient;
 
-try {
-  if (process.env.MISTRAL_API_KEY) {
-    (async () => {
-      const { default: { MistralClient: Client } } = await import('@mistralai/mistralai');
-      mistral = new Client(process.env.MISTRAL_API_KEY);
+(async () => {
+  try {
+    if (process.env.MISTRAL_API_KEY) {
+      const mistralModule = await import('@mistralai/mistralai/src/client.js');
+      mistralClient = new mistralModule.default(process.env.MISTRAL_API_KEY);
       console.log('Test Results Router: Mistral AI client initialized successfully');
-    })().catch(console.error);
+    } else {
+      console.warn('Test Results Router: MISTRAL_API_KEY is not set in environment variables');
+    }
+  } catch (error) {
+    console.warn('Test Results Router: Failed to initialize Mistral AI client:', error.message);
   }
-} catch (error) {
-  console.warn('Test Results Router: Failed to initialize Mistral AI client:', error.message);
-}
 
-try {
-  if (process.env.OPENAI_API_KEY) {
-    const OpenAI = require('openai');
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    console.log('Test Results Router: OpenAI client initialized');
+  try {
+    if (process.env.OPENAI_API_KEY) {
+      const OpenAI = require('openai');
+      openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      console.log('Test Results Router: OpenAI client initialized');
+    }
+  } catch (error) {
+    console.warn('Test Results Router: Failed to initialize OpenAI client:', error.message);
   }
-} catch (error) {
-  console.warn('Test Results Router: Failed to initialize OpenAI client:', error.message);
-}
+})();
 
 // Log middleware to track route access
 router.use((req, res, next) => {
@@ -143,21 +145,39 @@ router.post('/', auth, async (req, res) => {
       });
 
       // Update user's MBTI type with weighted result
-      await User.findByIdAndUpdate(req.user.userId, {
-        mbtiType: weightedResult.type,
-        personalityTraits: [
-          { trait: 'Extroversion-Introversion', strength: weightedResult.percentages.E },
-          { trait: 'Sensing-Intuition', strength: weightedResult.percentages.S },
-          { trait: 'Thinking-Feeling', strength: weightedResult.percentages.T },
-          { trait: 'Judging-Perceiving', strength: weightedResult.percentages.J }
-        ]
-      });
+      const user = await User.findById(req.user.userId);
+      user.mbtiType = weightedResult.type;
+      user.personalityTraits = [
+        { trait: 'Extroversion-Introversion', strength: weightedResult.percentages.E },
+        { trait: 'Sensing-Intuition', strength: weightedResult.percentages.S },
+        { trait: 'Thinking-Feeling', strength: weightedResult.percentages.T },
+        { trait: 'Judging-Perceiving', strength: weightedResult.percentages.J }
+      ];
+      
+      // Generate and store profile sections with weighted result
+      const profileSections = await user.getProfileSections(weightedResult);
+      user.profileSections = profileSections;
+      await user.save();
 
-      // Add weighted calculation to the response
+      // Add weighted calculation and profile sections to the response
       savedResult = {
         ...savedResult.toObject(),
-        weightedResult
+        weightedResult,
+        sections: profileSections,
+        profileSections,
+        testBreakdown: weightedResult.testBreakdown
       };
+
+      console.log('Updated user profile with sections:', {
+        userId: user._id,
+        mbtiType: user.mbtiType,
+        sectionCount: profileSections.length,
+        sections: profileSections.map(s => ({
+          id: s.id,
+          title: s.title,
+          contentCount: s.content?.length
+        }))
+      });
     }
 
     console.log('Successfully saved test result:', {
@@ -176,6 +196,88 @@ router.post('/', auth, async (req, res) => {
       },
       userId: req.user?.userId,
       testType: req.body?.testType,
+      timestamp: new Date().toISOString()
+    });
+    res.status(500).json({ 
+      message: 'Error storing test results',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Store test results directly (for testing)
+router.post('/test-results-direct', auth, async (req, res) => {
+  try {
+    console.log('Direct test-results route hit:', {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
+
+    const { testCategory, result } = req.body;
+
+    // Check if a result for this test category already exists
+    const existingResult = await TestResult.findOne({
+      user: req.user.userId,
+      testCategory
+    });
+
+    let savedResult;
+    if (existingResult) {
+      // Update existing result
+      existingResult.result = result;
+      existingResult.analysisVersion += 1;
+      savedResult = await existingResult.save();
+    } else {
+      // Create new result
+      const testResult = new TestResult({
+        user: req.user.userId,
+        testCategory,
+        result,
+        answers: [] // Direct test results don't have answers
+      });
+      savedResult = await testResult.save();
+    }
+
+    // Calculate weighted personality type
+    const weightedResult = await TestResult.calculateWeightedType(req.user.userId);
+    
+    if (weightedResult) {
+      // Update user's MBTI type with weighted result
+      const user = await User.findById(req.user.userId);
+      user.mbtiType = weightedResult.type;
+      user.personalityTraits = [
+        { trait: 'Extroversion-Introversion', strength: weightedResult.percentages.E },
+        { trait: 'Sensing-Intuition', strength: weightedResult.percentages.S },
+        { trait: 'Thinking-Feeling', strength: weightedResult.percentages.T },
+        { trait: 'Judging-Perceiving', strength: weightedResult.percentages.J }
+      ];
+      
+      // Generate and store profile sections with weighted result
+      const profileSections = await user.getProfileSections(weightedResult);
+      user.profileSections = profileSections;
+      await user.save();
+
+      // Add weighted calculation and profile sections to the response
+      savedResult = {
+        ...savedResult.toObject(),
+        weightedResult,
+        sections: profileSections,
+        profileSections,
+        testBreakdown: weightedResult.testBreakdown
+      };
+    }
+
+    return res.status(existingResult ? 200 : 201).json(savedResult);
+  } catch (error) {
+    console.error('Error in direct test results handler:', {
+      error: {
+        message: error.message,
+        stack: error.stack
+      },
+      userId: req.user?.userId,
+      testCategory: req.body?.testCategory,
       timestamp: new Date().toISOString()
     });
     res.status(500).json({ 

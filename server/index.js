@@ -31,9 +31,19 @@ const morgan = require('morgan');
 const http = require('http');
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
+
+// Register models
+require('./models/User');
+require('./models/Channel');
+require('./models/Message');
+require('./models/TestResult');
+
+// Import model instances
 const User = require('./models/User');
 const Channel = require('./models/Channel');
 const Message = require('./models/Message');
+const TestResult = require('./models/TestResult');
+const auth = require('./middleware/auth');
 
 // Initialize express app
 const app = express();
@@ -504,20 +514,93 @@ app.get('/api/test', (req, res) => {
 });
 
 // Direct test route for test-results
-app.post('/api/test-results-direct', (req, res) => {
-  console.log('Direct test-results route hit:', {
-    method: req.method,
-    headers: req.headers,
-    body: req.body,
-    timestamp: new Date().toISOString()
-  });
-  res.json({
-    message: 'Direct test-results route is working',
-    receivedData: {
+app.post('/api/test-results-direct', auth, async (req, res) => {
+  try {
+    console.log('Direct test-results route hit:', {
+      method: req.method,
       headers: req.headers,
-      body: req.body
+      body: req.body,
+      timestamp: new Date().toISOString()
+    });
+
+    // Check if a result for this test category already exists
+    const existingResult = await TestResult.findOne({
+      user: req.user.userId,
+      testCategory: req.body.testCategory
+    });
+
+    let savedResult;
+    if (existingResult) {
+      console.log('Updating existing test result:', {
+        resultId: existingResult._id,
+        testCategory: req.body.testCategory
+      });
+      // Update existing result
+      existingResult.result = req.body.result;
+      existingResult.analysisVersion += 1;
+      savedResult = await existingResult.save();
+    } else {
+      console.log('Creating new test result');
+      // Create new result
+      const testResult = new TestResult({
+        user: req.user.userId,
+        testCategory: req.body.testCategory,
+        result: req.body.result
+      });
+      savedResult = await testResult.save();
     }
-  });
+
+    // Calculate weighted personality type
+    const weightedResult = await TestResult.calculateWeightedType(req.user.userId);
+    
+    if (weightedResult) {
+      console.log('Updating user MBTI type with weighted calculation:', {
+        userId: req.user.userId,
+        oldType: req.body.result.type,
+        newType: weightedResult.type,
+        testBreakdown: weightedResult.testBreakdown
+      });
+
+      // Update user's MBTI type with weighted result
+      const user = await User.findById(req.user.userId);
+      user.mbtiType = weightedResult.type;
+      user.personalityTraits = [
+        { trait: 'Extroversion-Introversion', strength: weightedResult.percentages.E },
+        { trait: 'Sensing-Intuition', strength: weightedResult.percentages.S },
+        { trait: 'Thinking-Feeling', strength: weightedResult.percentages.T },
+        { trait: 'Judging-Perceiving', strength: weightedResult.percentages.J }
+      ];
+      
+      // Generate and store profile sections
+      const profileSections = await user.getProfileSections();
+      user.profileSections = profileSections;
+      await user.save();
+
+      // Add weighted calculation and profile sections to the response
+      savedResult = {
+        ...savedResult.toObject(),
+        weightedResult,
+        sections: profileSections,
+        profileSections
+      };
+    }
+
+    res.json(savedResult);
+  } catch (error) {
+    console.error('Error in direct test-results route:', {
+      error: {
+        message: error.message,
+        stack: error.stack
+      },
+      userId: req.user?.userId,
+      testType: req.body?.testCategory,
+      timestamp: new Date().toISOString()
+    });
+    res.status(500).json({ 
+      message: 'Error storing test results',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 });
 
 // Test routes for debugging

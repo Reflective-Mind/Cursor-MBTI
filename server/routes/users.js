@@ -8,89 +8,31 @@ const path = require('path');
 
 console.log('Initializing users router');
 
-// Initialize Mistral client if API key is available
+// Initialize AI clients if API keys are available
 let mistralClient;
+let openai;
 
-const initializeMistralClient = async () => {
-  try {
-    const envCheckResult = {
-      hasApiKey: !!process.env.MISTRAL_API_KEY,
-      apiKeyLength: process.env.MISTRAL_API_KEY?.length,
-      envVars: {
-        NODE_ENV: process.env.NODE_ENV,
-        PWD: process.cwd(),
-        SERVER_DIR: __dirname,
-        ENV_FILE: path.join(__dirname, '../.env')
-      }
-    };
-
-    console.log('Mistral client initialization check:', envCheckResult);
-
-    if (!process.env.MISTRAL_API_KEY) {
-      console.error('MISTRAL_API_KEY is not defined in environment variables.', {
-        envPath: path.join(__dirname, '../.env'),
-        availableEnvVars: Object.keys(process.env).filter(key => !key.includes('KEY')).join(', ')
-      });
-      return null;
-    }
-
-    // Import Mistral client using dynamic import
-    const { default: Mistral } = await import('@mistralai/mistralai');
-    
-    // Create client instance with proper configuration
-    const client = new Mistral(process.env.MISTRAL_API_KEY);
-
-    // Test the client with a simple request
-    try {
-      console.log('Testing Mistral client connection...');
-      const models = await client.listModels();
-      console.log('Successfully tested Mistral client connection:', {
-        availableModels: models.data?.map(m => m.id) || []
-      });
-    } catch (testError) {
-      console.error('Failed to test Mistral client:', {
-        error: testError.message,
-        stack: testError.stack,
-        type: testError.constructor.name
-      });
-      return null;
-    }
-
-    console.log('Users Router: Mistral AI client initialized successfully', {
-      clientExists: !!client,
-      timestamp: new Date().toISOString(),
-      apiKeyLength: process.env.MISTRAL_API_KEY.length
-    });
-
-    return client;
-  } catch (error) {
-    console.error('Users Router: Failed to initialize Mistral AI client:', {
-      error: error.message,
-      stack: error.stack,
-      type: error.constructor.name,
-      apiKeyExists: !!process.env.MISTRAL_API_KEY,
-      apiKeyLength: process.env.MISTRAL_API_KEY?.length
-    });
-    return null;
-  }
-};
-
-// Initialize Mistral client immediately and wait for it
 (async () => {
   try {
-    console.log('Starting Mistral client initialization...');
-    mistralClient = await initializeMistralClient();
-    if (mistralClient) {
-      console.log('Mistral client initialized successfully on router startup');
+    if (process.env.MISTRAL_API_KEY) {
+      const mistralModule = await import('@mistralai/mistralai/src/client.js');
+      mistralClient = new mistralModule.default(process.env.MISTRAL_API_KEY);
+      console.log('Users Router: Mistral AI client initialized successfully');
     } else {
-      console.error('Failed to initialize Mistral client on router startup');
+      console.warn('Users Router: MISTRAL_API_KEY is not set in environment variables');
     }
   } catch (error) {
-    console.error('Error during initial Mistral client initialization:', {
-      error: error.message,
-      stack: error.stack,
-      type: error.constructor.name
-    });
+    console.warn('Users Router: Failed to initialize Mistral AI client:', error.message);
+  }
+
+  try {
+    if (process.env.OPENAI_API_KEY) {
+      const OpenAI = require('openai');
+      openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      console.log('Users Router: OpenAI client initialized');
+    }
+  } catch (error) {
+    console.warn('Users Router: Failed to initialize OpenAI client:', error.message);
   }
 })();
 
@@ -102,8 +44,7 @@ router.get('/me', auth, async (req, res) => {
     });
 
     const user = await User.findById(req.user.userId)
-      .select('-password -__v')
-      .lean();
+      .select('-password -__v');
 
     if (!user) {
       console.log('Test 8 - Current user not found:', {
@@ -113,17 +54,25 @@ router.get('/me', auth, async (req, res) => {
     }
 
     // Add online status and last active time
-    user.isOnline = user.status === 'online';
-    user.lastActive = user.lastActive || new Date();
+    const userData = user.toObject();
+    userData.isOnline = userData.status === 'online';
+    userData.lastActive = userData.lastActive || new Date();
+
+    // Get profile sections with test breakdown
+    const sections = await user.getProfileSections();
+    userData.sections = sections;
+    userData.profileSections = sections;
 
     console.log('Test 8 - Current user profile found:', {
-      username: user.username,
-      mbtiType: user.mbtiType,
-      isOnline: user.isOnline,
-      lastActive: user.lastActive
+      username: userData.username,
+      mbtiType: userData.mbtiType,
+      isOnline: userData.isOnline,
+      lastActive: userData.lastActive,
+      sectionCount: userData.sections?.length,
+      sections: userData.sections
     });
 
-    res.json(user);
+    res.json(userData);
   } catch (error) {
     console.error('Test 8 - Get current user error:', {
       error: error.message,
@@ -587,8 +536,8 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
     // Initialize Mistral client if not already initialized
     if (!mistralClient) {
       console.log('Mistral client not initialized, attempting initialization...');
-      const { default: Mistral } = await import('@mistralai/mistralai');
-      mistralClient = new Mistral(process.env.MISTRAL_API_KEY);
+      const mistralModule = await import('@mistralai/mistralai/src/client.js');
+      mistralClient = new mistralModule.default(process.env.MISTRAL_API_KEY);
     }
 
     if (!mistralClient) {
