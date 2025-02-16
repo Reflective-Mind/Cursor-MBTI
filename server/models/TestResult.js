@@ -83,48 +83,46 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     }
   });
 
-  // Initialize weighted scores
+  // Initialize weighted scores with proper weighting
   const weightedScores = {
     E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0,
     totalWeight: 0
   };
 
-  // Calculate weighted scores using only the latest result of each test type
+  // Calculate weighted scores using proper test weights
   Object.values(latestByCategory).forEach(result => {
     const weight = this.TEST_WEIGHTS[result.testCategory];
     weightedScores.totalWeight += weight;
 
-    // Apply weight to each trait score with stronger emphasis on test category
+    // Apply exact weight to each trait score
     Object.entries(result.result.percentages).forEach(([trait, value]) => {
-      weightedScores[trait] += value * weight * (1 + weight * 2); // Increase influence of higher weighted tests
+      weightedScores[trait] += value * weight;
     });
   });
 
-  // Normalize scores for each dichotomy pair with adjusted weighting
+  // Normalize scores for each dichotomy pair
   const normalizedScores = {
     E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0
   };
 
-  // Normalize each dichotomy pair separately with weighted influence
+  // Calculate normalized scores with proper weighting
   [['E', 'I'], ['S', 'N'], ['T', 'F'], ['J', 'P']].forEach(([trait1, trait2]) => {
     const score1 = weightedScores[trait1];
     const score2 = weightedScores[trait2];
     const total = score1 + score2;
     
     if (total > 0) {
-      // Calculate normalized scores with weighted bias
-      const weightedBias = Math.min(0.15, weightedScores.totalWeight * 0.1); // Increased bias based on total weight
-      const rawScore1 = (score1 / total);
-      normalizedScores[trait1] = Math.round((rawScore1 + (rawScore1 > 0.5 ? weightedBias : -weightedBias)) * 100);
-      normalizedScores[trait2] = 100 - normalizedScores[trait1];
+      // Calculate exact normalized scores without bias
+      normalizedScores[trait1] = Math.round((score1 / total) * 100);
+      normalizedScores[trait2] = Math.round((score2 / total) * 100);
     } else {
-      // Default to neutral only if no data available
+      // Only use 50-50 if absolutely no data
       normalizedScores[trait1] = 50;
       normalizedScores[trait2] = 50;
     }
   });
 
-  // Calculate trait strengths with emphasis on test weights
+  // Calculate trait strengths based on normalized scores
   const traitStrengths = {
     EI: Math.abs(normalizedScores.E - normalizedScores.I),
     SN: Math.abs(normalizedScores.S - normalizedScores.N),
@@ -132,11 +130,8 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     JP: Math.abs(normalizedScores.J - normalizedScores.P)
   };
 
-  // Adjust minimum strength threshold based on test weights
-  const MINIMUM_STRENGTH_THRESHOLD = Math.max(
-    15,  // Base threshold
-    weightedScores.totalWeight * 10  // Increased weighted threshold adjustment
-  );
+  // Use strict threshold for balanced traits
+  const MINIMUM_STRENGTH_THRESHOLD = 15;
 
   // Determine final type based on normalized scores
   const finalType = [
@@ -146,13 +141,14 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     normalizedScores.J > normalizedScores.P ? 'J' : 'P'
   ].join('');
 
-  // Calculate test contributions with adjusted weights
+  // Calculate exact test contributions
   const testContributions = Object.values(latestByCategory).map(r => ({
     category: r.testCategory,
     weight: Math.round((this.TEST_WEIGHTS[r.testCategory] / weightedScores.totalWeight) * 100),
     type: r.result.type,
     date: r.createdAt,
-    percentages: r.result.percentages
+    percentages: r.result.percentages,
+    baseWeight: this.TEST_WEIGHTS[r.testCategory] * 100
   })).sort((a, b) => b.weight - a.weight);
 
   // Get personality title
