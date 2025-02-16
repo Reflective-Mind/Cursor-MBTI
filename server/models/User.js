@@ -297,26 +297,34 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
   const defaultSections = [];
   
   if (weightedResult) {
-    // Format trait strengths for better display
+    // Format trait analysis to show growth areas and interaction styles
     const traitAnalysis = [
       {
-        trait1: { letter: 'E', score: weightedResult.percentages.E },
-        trait2: { letter: 'I', score: weightedResult.percentages.I },
+        trait1: { letter: 'E', score: weightedResult.percentages.E, 
+                 focus: 'External World', style: 'Social Energy' },
+        trait2: { letter: 'I', score: weightedResult.percentages.I,
+                 focus: 'Inner World', style: 'Personal Energy' },
         strength: Math.abs(weightedResult.percentages.E - weightedResult.percentages.I)
       },
       {
-        trait1: { letter: 'S', score: weightedResult.percentages.S },
-        trait2: { letter: 'N', score: weightedResult.percentages.N },
+        trait1: { letter: 'S', score: weightedResult.percentages.S,
+                 focus: 'Concrete Details', style: 'Learning Style' },
+        trait2: { letter: 'N', score: weightedResult.percentages.N,
+                 focus: 'Abstract Patterns', style: 'Learning Style' },
         strength: Math.abs(weightedResult.percentages.S - weightedResult.percentages.N)
       },
       {
-        trait1: { letter: 'T', score: weightedResult.percentages.T },
-        trait2: { letter: 'F', score: weightedResult.percentages.F },
+        trait1: { letter: 'T', score: weightedResult.percentages.T,
+                 focus: 'Logic & Analysis', style: 'Decision Making' },
+        trait2: { letter: 'F', score: weightedResult.percentages.F,
+                 focus: 'Values & Impact', style: 'Decision Making' },
         strength: Math.abs(weightedResult.percentages.T - weightedResult.percentages.F)
       },
       {
-        trait1: { letter: 'J', score: weightedResult.percentages.J },
-        trait2: { letter: 'P', score: weightedResult.percentages.P },
+        trait1: { letter: 'J', score: weightedResult.percentages.J,
+                 focus: 'Structure & Planning', style: 'Work Style' },
+        trait2: { letter: 'P', score: weightedResult.percentages.P,
+                 focus: 'Flexibility & Adaptation', style: 'Work Style' },
         strength: Math.abs(weightedResult.percentages.J - weightedResult.percentages.P)
       }
     ];
@@ -334,7 +342,7 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
         },
         {
           id: 'trait-strengths',
-          title: 'Trait Analysis',
+          title: 'Interaction & Growth Analysis',
           description: traitAnalysis,
           contentType: 'traits'
         },
@@ -424,110 +432,120 @@ userSchema.methods.generateAIStory = async function() {
       throw new Error('No answers found in test results');
     }
 
-    // Group answers by their implications rather than by category
-    const personalityInsights = {
-      socialStyle: allAnswers.filter(a => 
+    // Group answers by themes for better narrative flow
+    const themes = {
+      social: allAnswers.filter(a => 
         a.question?.toLowerCase().includes('social') || 
         a.question?.toLowerCase().includes('group') ||
-        a.question?.toLowerCase().includes('people')
+        a.question?.toLowerCase().includes('people') ||
+        a.question?.toLowerCase().includes('communicate')
       ),
-      thinkingStyle: allAnswers.filter(a => 
-        a.question?.toLowerCase().includes('decision') || 
-        a.question?.toLowerCase().includes('problem') ||
-        a.question?.toLowerCase().includes('think')
-      ),
-      workStyle: allAnswers.filter(a => 
+      work: allAnswers.filter(a => 
         a.question?.toLowerCase().includes('work') || 
+        a.question?.toLowerCase().includes('project') ||
         a.question?.toLowerCase().includes('organize') ||
         a.question?.toLowerCase().includes('plan')
       ),
-      energyStyle: allAnswers.filter(a => 
+      learning: allAnswers.filter(a => 
+        a.question?.toLowerCase().includes('learn') || 
+        a.question?.toLowerCase().includes('problem') ||
+        a.question?.toLowerCase().includes('understand') ||
+        a.question?.toLowerCase().includes('information')
+      ),
+      values: allAnswers.filter(a => 
+        a.question?.toLowerCase().includes('value') || 
+        a.question?.toLowerCase().includes('decision') ||
+        a.question?.toLowerCase().includes('important') ||
+        a.question?.toLowerCase().includes('feel')
+      ),
+      energy: allAnswers.filter(a => 
         a.question?.toLowerCase().includes('energy') || 
         a.question?.toLowerCase().includes('recharge') ||
+        a.question?.toLowerCase().includes('relax') ||
         a.question?.toLowerCase().includes('prefer')
       )
     };
 
     let story = '';
-
-    // Build a narrative based on actual answers
     const insights = [];
 
-    // Social Interaction Style
-    if (personalityInsights.socialStyle.length > 0) {
-      const socialPreference = personalityInsights.socialStyle.map(a => ({
-        text: a.question?.toLowerCase(),
-        isExtroverted: a.answer === 'E'
-      }));
-      
-      const extrovertedCount = socialPreference.filter(p => p.isExtroverted).length;
-      const socialStyle = extrovertedCount > socialPreference.length / 2 ? 'outgoing' : 'reserved';
-      
-      insights.push(`When it comes to social situations, this person is naturally ${socialStyle}, as shown by their ${
-        socialPreference.map(p => `approach to ${p.text}`).join(' and ')
-      }`);
+    // Build narrative sections based on available data
+    if (themes.social.length > 0) {
+      const socialStyle = themes.social.filter(a => a.answer === 'E').length > themes.social.length / 2 
+        ? 'naturally outgoing and socially engaged' 
+        : 'thoughtful and selective in social interactions';
+      insights.push(`In social settings, this individual is ${socialStyle}. They tend to ${
+        themes.social.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
+          .replace('your', 'their')
+          .replace('?', '')).join(' and ')
+      }.`);
     }
 
-    // Thinking and Decision-Making Style
-    if (personalityInsights.thinkingStyle.length > 0) {
-      const decisions = personalityInsights.thinkingStyle.map(a => ({
-        text: a.question?.toLowerCase(),
-        isLogical: a.answer === 'T'
-      }));
-      
-      const logicalCount = decisions.filter(d => d.isLogical).length;
-      const decisionStyle = logicalCount > decisions.length / 2 ? 'analytical' : 'empathetic';
-      
-      insights.push(`Their decision-making style is predominantly ${decisionStyle}, particularly when ${
-        decisions.map(d => d.text).join(' and when ')
-      }`);
+    if (themes.work.length > 0) {
+      const workStyle = themes.work.filter(a => a.answer === 'J').length > themes.work.length / 2
+        ? 'structured and methodical'
+        : 'flexible and adaptable';
+      insights.push(`Their approach to work is ${workStyle}, particularly when ${
+        themes.work.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
+          .replace('your', 'their')
+          .replace('?', '')).join(' and when ')
+      }.`);
     }
 
-    // Work and Organization Style
-    if (personalityInsights.workStyle.length > 0) {
-      const workApproach = personalityInsights.workStyle.map(a => ({
-        text: a.question?.toLowerCase(),
-        isStructured: a.answer === 'J'
-      }));
-      
-      const structuredCount = workApproach.filter(w => w.isStructured).length;
-      const workStyle = structuredCount > workApproach.length / 2 ? 'methodical' : 'flexible';
-      
-      insights.push(`At work or in projects, they take a ${workStyle} approach, especially when ${
-        workApproach.map(w => w.text).join(' and when ')
-      }`);
+    if (themes.learning.length > 0) {
+      const learningStyle = themes.learning.filter(a => a.answer === 'N').length > themes.learning.length / 2
+        ? 'focus on patterns and possibilities'
+        : 'prefer concrete facts and practical applications';
+      insights.push(`When learning or problem-solving, they ${learningStyle}. This is evident in how ${
+        themes.learning.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
+          .replace('your', 'their')
+          .replace('?', '')).join(' and how ')
+      }.`);
     }
 
-    // Energy and Recharging Style
-    if (personalityInsights.energyStyle.length > 0) {
-      const energyPatterns = personalityInsights.energyStyle.map(a => ({
-        text: a.question?.toLowerCase(),
-        isExternal: a.answer === 'E'
-      }));
-      
-      const externalCount = energyPatterns.filter(e => e.isExternal).length;
-      const energyStyle = externalCount > energyPatterns.length / 2 ? 
-        'draws energy from social interaction' : 
-        'recharges through personal space';
-      
-      insights.push(`This individual ${energyStyle}, which is evident in how they ${
-        energyPatterns.map(e => e.text).join(' and how they ')
-      }`);
+    if (themes.values.length > 0) {
+      const decisionStyle = themes.values.filter(a => a.answer === 'F').length > themes.values.length / 2
+        ? 'prioritize personal values and emotional impact'
+        : 'focus on logical analysis and objective criteria';
+      insights.push(`In decision-making, they ${decisionStyle}. This is reflected in how ${
+        themes.values.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
+          .replace('your', 'their')
+          .replace('?', '')).join(' and how ')
+      }.`);
+    }
+
+    if (themes.energy.length > 0) {
+      const energyStyle = themes.energy.filter(a => a.answer === 'E').length > themes.energy.length / 2
+        ? 'gain energy through social interaction and external engagement'
+        : 'recharge through solitude and internal reflection';
+      insights.push(`They typically ${energyStyle}. This is demonstrated by how ${
+        themes.energy.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
+          .replace('your', 'their')
+          .replace('?', '')).join(' and how ')
+      }.`);
     }
 
     // Combine insights into a cohesive narrative
-    story = insights.join('. ') + '.';
+    story = insights.join('\n\n');
 
-    // Add specific behavioral examples if available
-    const uniqueBehaviors = allAnswers
-      .filter(a => a.question && !Object.values(personalityInsights).flat().includes(a))
-      .map(a => a.question?.toLowerCase())
-      .filter(q => q);
+    // Add unique characteristics if available
+    const uniqueAnswers = allAnswers.filter(a => 
+      !Object.values(themes).flat().includes(a) && 
+      a.question && 
+      !a.question.includes('?')
+    );
 
-    if (uniqueBehaviors.length > 0) {
-      story += `\n\nSpecific traits that stand out include their approach to ${
-        uniqueBehaviors.slice(0, 3).join(', ')
-      }.`;
+    if (uniqueAnswers.length > 0) {
+      const uniqueTraits = uniqueAnswers.slice(0, 3)
+        .map(a => a.question?.toLowerCase().replace('you', 'they')
+          .replace('your', 'their'));
+      
+      story += `\n\nDistinctive characteristics include ${uniqueTraits.join(', ')}.`;
+    }
+
+    // Add summary based on test history if multiple tests exist
+    if (results.length > 1) {
+      story += `\n\nThis analysis is based on ${results.length} personality assessments taken over time, providing a comprehensive view of their personality traits and tendencies.`;
     }
 
     return story;
