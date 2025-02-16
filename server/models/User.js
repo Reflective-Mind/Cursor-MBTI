@@ -356,67 +356,76 @@ function generatePersonalityOverview(weightedResult) {
 
 // Add method to generate AI story
 userSchema.methods.generateAIStory = async function() {
-  const TestResult = mongoose.model('TestResult');
-  const results = await TestResult.find({ user: this._id }).sort({ createdAt: -1 });
-  
-  if (!results || results.length === 0) {
-    throw new Error('No test results available');
-  }
-
-  // Analyze answers for each category
-  const categoryAnalysis = {};
-  const categories = ['EI', 'SN', 'TF', 'JP'];
-  
-  for (const category of categories) {
-    categoryAnalysis[category] = await this.analyzeAnswersForCategory(results, category);
-  }
-
-  // Get weighted type and trait strengths
-  const weightedResult = await TestResult.calculateWeightedType(results);
-  const { type, traitStrengths } = weightedResult;
-
-  // Calculate total questions answered
-  const totalQuestions = results.reduce((sum, result) => {
-    return sum + (result.answers ? Object.keys(result.answers).length : 0);
-  }, 0);
-
-  // Generate comprehensive story
-  let story = `Based on your ${totalQuestions} answered questions across ${results.length} test(s), here's a detailed analysis of your personality type ${type}:\n\n`;
-
-  // Add trait analysis
-  for (const category of categories) {
-    const traits = category.split('');
-    const strength = traitStrengths[category];
-    const analysis = categoryAnalysis[category];
+  try {
+    const TestResult = mongoose.model('TestResult');
+    const results = await TestResult.find({ user: this._id }).sort({ createdAt: -1 });
     
-    story += `\n${traits[0]}/${traits[1]} Dimension (${Math.abs(strength)}% ${strength > 0 ? traits[0] : traits[1]}):\n`;
-    story += analysis + '\n';
-  }
-
-  // Add test breakdown
-  story += '\n\nTest History:\n';
-  for (const result of results) {
-    const questionCount = result.answers ? Object.keys(result.answers).length : 0;
-    const date = new Date(result.createdAt).toLocaleDateString();
-    story += `- ${result.testCategory} (${questionCount} questions) taken on ${date}: ${result.result.type}\n`;
-  }
-
-  // Add recommendations
-  story += '\n\nRecommendations for Growth:\n';
-  for (const category of categories) {
-    const traits = category.split('');
-    const strength = traitStrengths[category];
-    const dominantTrait = strength > 0 ? traits[0] : traits[1];
-    const recessiveTrait = strength > 0 ? traits[1] : traits[0];
-    
-    if (Math.abs(strength) > 70) {
-      story += `- Consider developing your ${recessiveTrait} side to balance your strong ${dominantTrait} preference\n`;
-    } else if (Math.abs(strength) < 30) {
-      story += `- Your balanced ${traits[0]}/${traits[1]} preference allows you to adapt well. Continue developing both aspects\n`;
+    if (!results || results.length === 0) {
+      throw new Error('No test results available');
     }
-  }
 
-  return story;
+    // Get weighted type and trait strengths
+    const weightedResult = await TestResult.calculateWeightedType(this._id);
+    if (!weightedResult) {
+      throw new Error('Could not calculate weighted personality type');
+    }
+
+    const { type, traitStrengths, percentages, testBreakdown } = weightedResult;
+
+    // Calculate total questions answered
+    const totalQuestions = results.reduce((sum, result) => {
+      return sum + (result.answers ? Object.keys(result.answers).length : 0);
+    }, 0);
+
+    // Generate comprehensive story
+    let story = `Based on your ${totalQuestions} answered questions across ${results.length} test(s), here's a detailed analysis of your personality type ${type}:\n\n`;
+
+    // Add trait analysis
+    const categories = ['EI', 'SN', 'TF', 'JP'];
+    for (const category of categories) {
+      const traits = category.split('');
+      const strength = traitStrengths[category];
+      const dominantTrait = strength > 0 ? traits[0] : traits[1];
+      const score = percentages[dominantTrait];
+      
+      story += `\n${traits[0]}/${traits[1]} Dimension (${Math.abs(strength)}% ${dominantTrait}):\n`;
+      story += await this.analyzeAnswersForCategory(results, category);
+      story += `\nStrength: ${Math.abs(strength)}% preference for ${dominantTrait === traits[0] ? traits[0] : traits[1]}\n`;
+    }
+
+    // Add test breakdown
+    story += '\n\nTest History:\n';
+    for (const test of testBreakdown) {
+      const date = new Date(test.date).toLocaleDateString();
+      story += `- ${test.category} (${Math.round(test.effectiveWeight)}% contribution) taken on ${date}: ${test.type}\n`;
+    }
+
+    // Add recommendations
+    story += '\n\nRecommendations for Growth:\n';
+    for (const category of categories) {
+      const traits = category.split('');
+      const strength = traitStrengths[category];
+      const dominantTrait = strength > 0 ? traits[0] : traits[1];
+      const recessiveTrait = strength > 0 ? traits[1] : traits[0];
+      
+      if (Math.abs(strength) > 70) {
+        story += `- Consider developing your ${recessiveTrait} side to balance your strong ${dominantTrait} preference\n`;
+      } else if (Math.abs(strength) < 30) {
+        story += `- Your balanced ${traits[0]}/${traits[1]} preference allows you to adapt well. Continue developing both aspects\n`;
+      }
+    }
+
+    return story;
+  } catch (error) {
+    console.error('Error generating AI story:', {
+      userId: this._id,
+      error: {
+        message: error.message,
+        stack: error.stack
+      }
+    });
+    throw error;
+  }
 };
 
 userSchema.methods.analyzeAnswersForCategory = async function(results, category) {
