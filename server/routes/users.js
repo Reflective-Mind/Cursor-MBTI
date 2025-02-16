@@ -399,42 +399,42 @@ router.patch('/:userId/sections/:sectionId', auth, async (req, res) => {
 // Delete section
 router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
   try {
-    console.log('Delete section request:', {
-      userId: req.params.userId,
-      sectionId: req.params.sectionId
-    });
-
-    if (req.params.userId !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized to modify this profile' });
+    const { userId, sectionId } = req.params;
+    
+    // Verify user authorization
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'Not authorized to modify this profile' });
     }
 
-    const user = await User.findById(req.params.userId);
+    const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // Find the section
-    const section = user.profileSections.find(s => s.id === req.params.sectionId);
-    console.log('Found section:', section);
-
-    if (!section) {
-      return res.status(404).json({ message: 'Section not found' });
+    // Find section index
+    const sectionIndex = user.profileSections.findIndex(section => section.id === sectionId);
+    if (sectionIndex === -1) {
+      return res.status(404).json({ error: 'Section not found' });
     }
 
-    // Prevent deletion of the main personality overview
+    // Check if trying to delete personality section
+    const section = user.profileSections[sectionIndex];
     if (section.type === 'personality' && section.id === 'personality') {
-      return res.status(400).json({ message: 'Cannot delete the main personality section' });
+      return res.status(403).json({ error: 'Cannot delete personality section' });
     }
 
-    // Remove the section
-    user.profileSections = user.profileSections.filter(s => s.id !== req.params.sectionId);
+    // Remove section
+    user.profileSections.splice(sectionIndex, 1);
     await user.save();
 
-    console.log('Section deleted successfully');
-    res.json({ message: 'Section deleted successfully' });
+    // Get updated sections
+    const weightedResult = await TestResult.calculateWeightedType(userId);
+    const updatedSections = await user.getProfileSections(weightedResult);
+
+    res.json({ sections: updatedSections });
   } catch (error) {
     console.error('Error deleting section:', error);
-    res.status(500).json({ message: 'Error deleting section', details: error.message });
+    res.status(500).json({ error: 'Failed to delete section' });
   }
 });
 
@@ -584,52 +584,39 @@ router.put('/me', auth, async (req, res) => {
 // Generate AI Story
 router.post('/:userId/generate-story', auth, async (req, res) => {
   try {
-    console.log('Generate AI story request:', {
-      userId: req.params.userId,
-      timestamp: new Date().toISOString()
-    });
+    const { userId } = req.params;
 
-    if (req.params.userId !== req.user.userId) {
-      return res.status(403).json({ message: 'Not authorized' });
+    // Verify user authorization
+    if (req.user.id !== userId) {
+      return res.status(403).json({ error: 'Not authorized to generate story for this user' });
     }
 
-    const user = await User.findById(req.params.userId);
+    const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check for test results
-    const TestResult = mongoose.model('TestResult');
-    const results = await TestResult.find({ user: user._id });
-    if (!results || results.length === 0) {
-      return res.status(400).json({ message: 'No test results available for analysis' });
+    // Get test results and calculate weighted type
+    const weightedResult = await TestResult.calculateWeightedType(userId);
+    if (!weightedResult) {
+      return res.status(400).json({ error: 'No test results found' });
     }
 
-    console.log('Generating AI story with test results:', {
-      resultCount: results.length,
-      latestType: results[0]?.result?.type
-    });
-
-    // Generate the AI story
-    const story = await user.generateAIStory();
+    // Generate AI story
+    const story = await user.generateAIStory(weightedResult);
     if (!story) {
-      throw new Error('Failed to generate AI story');
+      return res.status(500).json({ error: 'Failed to generate story' });
     }
 
-    console.log('AI story generated successfully');
-    
-    // Create a unique ID for the new section
-    const timestamp = Date.now();
-    const sectionId = `ai-story-${timestamp}`;
-    
-    // Create new section with the story
+    // Create new section with unique ID
+    const newSectionId = new mongoose.Types.ObjectId().toString();
     const newSection = {
-      id: sectionId,
-      title: `AI Analysis (${new Date().toLocaleDateString()})`,
-      type: 'ai-analysis',
+      id: newSectionId,
+      title: 'Your Personality Deep Dive',
+      type: 'ai_analysis',
       content: [{
-        id: `story-${timestamp}`,
-        title: 'Personality Deep Dive',
+        id: new mongoose.Types.ObjectId().toString(),
+        title: 'AI Generated Analysis',
         description: story,
         contentType: 'text'
       }],
@@ -637,31 +624,16 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
       isVisible: true
     };
 
-    console.log('Creating new section:', {
-      sectionId,
-      contentLength: story.length
-    });
-
-    // Add the new section
+    // Add new section
     user.profileSections.push(newSection);
     await user.save();
 
-    console.log('Section saved successfully');
-
-    res.json({ 
-      message: 'AI story generated successfully',
-      section: newSection
-    });
+    // Get updated sections
+    const updatedSections = await user.getProfileSections(weightedResult);
+    res.json({ sections: updatedSections });
   } catch (error) {
-    console.error('Error generating AI story:', {
-      error: error.message,
-      stack: error.stack,
-      userId: req.params.userId
-    });
-    res.status(500).json({ 
-      message: 'Error generating AI story', 
-      details: error.message 
-    });
+    console.error('Error generating story:', error);
+    res.status(500).json({ error: 'Failed to generate story' });
   }
 });
 

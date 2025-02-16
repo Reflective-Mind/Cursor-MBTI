@@ -296,21 +296,47 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
   }
 
   // Define default sections with proper structure
-  const defaultSections = [{
-    id: 'personality',
-    title: weightedResult ? weightedResult.profileTitle : 'Personality Profile',
-    type: 'personality',
-    content: [
-      {
-        id: 'overview',
-        title: 'Personality Overview',
-        description: weightedResult ? generatePersonalityOverview(weightedResult) : 'Take a personality test to see your results',
-        contentType: 'text'
-      }
-    ],
-    order: this.defaultSections?.personality?.order || 0,
-    isVisible: this.defaultSections?.personality?.isVisible !== false
-  }];
+  const defaultSections = [];
+  
+  if (weightedResult) {
+    // Add personality overview section
+    defaultSections.push({
+      id: 'personality',
+      title: weightedResult.profileTitle,
+      type: 'personality',
+      content: [
+        {
+          id: 'overview',
+          title: 'Personality Overview',
+          description: generatePersonalityOverview(weightedResult),
+          contentType: 'text'
+        },
+        {
+          id: 'trait-strengths',
+          title: 'Trait Analysis',
+          description: weightedResult.traitStrengths,
+          contentType: 'traits'
+        },
+        {
+          id: 'test-breakdown',
+          title: 'Test History',
+          description: weightedResult.testBreakdown,
+          contentType: 'breakdown'
+        }
+      ],
+      order: this.defaultSections?.personality?.order || 0,
+      isVisible: this.defaultSections?.personality?.isVisible !== false
+    });
+  }
+
+  // Add existing custom sections
+  if (this.profileSections && this.profileSections.length > 0) {
+    // Only add non-personality sections
+    const customSections = this.profileSections.filter(section => 
+      section.type !== 'personality' && section.id !== 'personality'
+    );
+    defaultSections.push(...customSections);
+  }
 
   return defaultSections;
 };
