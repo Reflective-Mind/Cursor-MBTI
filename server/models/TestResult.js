@@ -61,9 +61,9 @@ const testResultSchema = new mongoose.Schema({
 
 // Weight factors for different test types
 testResultSchema.statics.TEST_WEIGHTS = {
-  'mbti-100': 1.0,    // 100% weight
-  'mbti-24': 0.24,    // 24% weight
-  'mbti-8': 0.08      // 8% weight
+  'mbti-100': 1.0,    // 100% weight for comprehensive test
+  'mbti-24': 0.24,    // 24% weight for standard test
+  'mbti-8': 0.08      // 8% weight for quick test
 };
 
 // Calculate weighted personality type from multiple test results
@@ -90,35 +90,50 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     });
   });
 
-  // Normalize scores
-  Object.keys(weightedScores).forEach(trait => {
-    if (trait !== 'totalWeight') {
-      weightedScores[trait] = Math.round(weightedScores[trait] / weightedScores.totalWeight);
-    }
-  });
+  // Normalize scores and ensure they sum to 100% for each dichotomy
+  const normalizedScores = {
+    E: Math.round(weightedScores.E / weightedScores.totalWeight),
+    I: Math.round(weightedScores.I / weightedScores.totalWeight),
+    S: Math.round(weightedScores.S / weightedScores.totalWeight),
+    N: Math.round(weightedScores.N / weightedScores.totalWeight),
+    T: Math.round(weightedScores.T / weightedScores.totalWeight),
+    F: Math.round(weightedScores.F / weightedScores.totalWeight),
+    J: Math.round(weightedScores.J / weightedScores.totalWeight),
+    P: Math.round(weightedScores.P / weightedScores.totalWeight)
+  };
 
-  // Determine final type
+  // Determine final type based on normalized scores
   const finalType = [
-    weightedScores.E > weightedScores.I ? 'E' : 'I',
-    weightedScores.S > weightedScores.N ? 'S' : 'N',
-    weightedScores.T > weightedScores.F ? 'T' : 'F',
-    weightedScores.J > weightedScores.P ? 'J' : 'P'
+    normalizedScores.E > normalizedScores.I ? 'E' : 'I',
+    normalizedScores.S > normalizedScores.N ? 'S' : 'N',
+    normalizedScores.T > normalizedScores.F ? 'T' : 'F',
+    normalizedScores.J > normalizedScores.P ? 'J' : 'P'
   ].join('');
+
+  // Calculate trait strengths (difference between opposing traits)
+  const traitStrengths = {
+    EI: Math.abs(normalizedScores.E - normalizedScores.I),
+    SN: Math.abs(normalizedScores.S - normalizedScores.N),
+    TF: Math.abs(normalizedScores.T - normalizedScores.F),
+    JP: Math.abs(normalizedScores.J - normalizedScores.P)
+  };
 
   return {
     type: finalType,
-    percentages: weightedScores,
+    percentages: normalizedScores,
     dominantTraits: {
-      attitude: weightedScores.E > weightedScores.I ? 'Extroversion' : 'Introversion',
-      perception: weightedScores.S > weightedScores.N ? 'Sensing' : 'Intuition',
-      judgment: weightedScores.T > weightedScores.F ? 'Thinking' : 'Feeling',
-      lifestyle: weightedScores.J > weightedScores.P ? 'Judging' : 'Perceiving'
+      attitude: normalizedScores.E > normalizedScores.I ? 'Extroversion' : 'Introversion',
+      perception: normalizedScores.S > normalizedScores.N ? 'Sensing' : 'Intuition',
+      judgment: normalizedScores.T > normalizedScores.F ? 'Thinking' : 'Feeling',
+      lifestyle: normalizedScores.J > normalizedScores.P ? 'Judging' : 'Perceiving'
     },
+    traitStrengths,
     testBreakdown: results.map(r => ({
       category: r.testCategory,
-      weight: this.TEST_WEIGHTS[r.testCategory],
+      weight: Math.round(this.TEST_WEIGHTS[r.testCategory] * 100 / weightedScores.totalWeight),
       type: r.result.type,
-      date: r.createdAt
+      date: r.createdAt,
+      percentages: r.result.percentages
     }))
   };
 };

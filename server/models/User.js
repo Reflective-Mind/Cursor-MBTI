@@ -252,26 +252,29 @@ userSchema.methods.getProfileSections = async function() {
       content: [
         {
           id: 'overview',
-          title: 'MBTI Overview',
-          description: `Your personality type is ${this.mbtiType}, determined through multiple assessments with weighted calculations.`,
+          title: 'MBTI Personality Overview',
+          description: weightedResult ? 
+            `Based on your test results, you are predominantly ${this.mbtiType}. Your personality type combines ${weightedResult.dominantTraits.attitude}, ${weightedResult.dominantTraits.perception}, ${weightedResult.dominantTraits.judgment}, and ${weightedResult.dominantTraits.lifestyle} traits, creating a unique perspective on the world.` :
+            `Your personality type is ${this.mbtiType}. Take more MBTI tests to get a detailed analysis of your personality traits.`,
           contentType: 'text'
         },
         ...(weightedResult ? [{
           id: 'test-breakdown',
-          title: 'Test Results Breakdown',
+          title: 'Test Results Analysis',
           description: formatTestBreakdown(weightedResult),
           contentType: 'text'
         }] : []),
         ...(weightedResult ? weightedResult.testBreakdown.map((test, index) => ({
           id: `test-${index}`,
-          title: `${test.category.toUpperCase()} Test`,
-          description: `Type: ${test.type} | Weight: ${Math.round(test.weight * 100)}% | Date: ${new Date(test.date).toLocaleDateString()}`,
+          title: `${test.category.toUpperCase()} Test Details`,
+          description: `Type: ${test.type}\nWeight: ${test.weight}%\nDate: ${new Date(test.date).toLocaleDateString()}\nTrait Percentages: ${Object.entries(test.percentages).map(([trait, value]) => `${trait}: ${value}%`).join(', ')}`,
           contentType: 'text'
         })) : []),
         ...this.personalityTraits.map((trait, index) => ({
           id: `trait-${index}`,
           title: trait.trait,
           value: trait.strength,
+          description: `${trait.trait} Strength: ${trait.strength}%`,
           contentType: 'progress'
         }))
       ]
@@ -329,22 +332,22 @@ userSchema.methods.getProfileSections = async function() {
 // Helper function to get personality type title
 function getPersonalityTitle(mbtiType) {
   const titles = {
-    'INTJ': 'Architect & Strategic Thinker',
-    'INTP': 'Logical & Innovative Analyst',
-    'ENTJ': 'Dynamic & Strategic Leader',
-    'ENTP': 'Innovative & Versatile Explorer',
-    'INFJ': 'Insightful & Empathetic Guide',
-    'INFP': 'Creative & Authentic Idealist',
-    'ENFJ': 'Charismatic & Inspiring Leader',
-    'ENFP': 'Enthusiastic & Creative Catalyst',
-    'ISTJ': 'Reliable & Systematic Organizer',
-    'ISFJ': 'Dedicated & Nurturing Protector',
-    'ESTJ': 'Efficient & Practical Manager',
-    'ESFJ': 'Supportive & Social Harmonizer',
-    'ISTP': 'Skilled & Adaptable Craftsperson',
-    'ISFP': 'Artistic & Compassionate Creator',
-    'ESTP': 'Energetic & Practical Doer',
-    'ESFP': 'Spontaneous & Engaging Performer'
+    'INTJ': 'Architect - Strategic & Analytical Mastermind',
+    'INTP': 'Logician - Innovative Problem Solver',
+    'ENTJ': 'Commander - Dynamic & Strategic Leader',
+    'ENTP': 'Debater - Innovative & Versatile Thinker',
+    'INFJ': 'Counselor - Insightful & Empathetic Guide',
+    'INFP': 'Mediator - Creative & Authentic Idealist',
+    'ENFJ': 'Teacher - Charismatic & Inspiring Leader',
+    'ENFP': 'Champion - Enthusiastic & Creative Catalyst',
+    'ISTJ': 'Inspector - Reliable & Systematic Organizer',
+    'ISFJ': 'Protector - Dedicated & Nurturing Guardian',
+    'ESTJ': 'Supervisor - Efficient & Practical Manager',
+    'ESFJ': 'Provider - Supportive & Social Harmonizer',
+    'ISTP': 'Craftsperson - Skilled & Adaptable Problem-Solver',
+    'ISFP': 'Composer - Artistic & Compassionate Creator',
+    'ESTP': 'Dynamo - Energetic & Practical Doer',
+    'ESFP': 'Performer - Spontaneous & Engaging Entertainer'
   };
   return titles[mbtiType] || 'Personality Type';
 }
@@ -352,19 +355,28 @@ function getPersonalityTitle(mbtiType) {
 // Helper function to format test breakdown
 function formatTestBreakdown(weightedResult) {
   const traits = [
-    { name: 'Extroversion-Introversion', e: 'E', i: 'I', eScore: weightedResult.percentages.E, iScore: weightedResult.percentages.I },
-    { name: 'Sensing-Intuition', e: 'S', i: 'N', eScore: weightedResult.percentages.S, iScore: weightedResult.percentages.N },
-    { name: 'Thinking-Feeling', e: 'T', i: 'F', eScore: weightedResult.percentages.T, iScore: weightedResult.percentages.F },
-    { name: 'Judging-Perceiving', e: 'J', i: 'P', eScore: weightedResult.percentages.J, iScore: weightedResult.percentages.P }
+    { name: 'Extroversion-Introversion', e: 'E', i: 'I', eScore: weightedResult.percentages.E, iScore: weightedResult.percentages.I, strength: weightedResult.traitStrengths.EI },
+    { name: 'Sensing-Intuition', e: 'S', i: 'N', eScore: weightedResult.percentages.S, iScore: weightedResult.percentages.N, strength: weightedResult.traitStrengths.SN },
+    { name: 'Thinking-Feeling', e: 'T', i: 'F', eScore: weightedResult.percentages.T, iScore: weightedResult.percentages.F, strength: weightedResult.traitStrengths.TF },
+    { name: 'Judging-Perceiving', e: 'J', i: 'P', eScore: weightedResult.percentages.J, iScore: weightedResult.percentages.P, strength: weightedResult.traitStrengths.JP }
   ];
 
-  return `
-Your personality type is calculated using a weighted average of all your test results:
+  const testContributions = weightedResult.testBreakdown
+    .sort((a, b) => b.weight - a.weight)
+    .map(test => `${test.category.toUpperCase()}: ${test.type} (${test.weight}% contribution)`)
+    .join('\n');
 
+  return `
+Your personality type is calculated using a weighted average of your test results:
+
+Test Contributions:
+${testContributions}
+
+Trait Analysis:
 ${traits.map(trait => `
 ${trait.name}:
 ${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
-Primary trait: ${trait.eScore > trait.iScore ? trait.e : trait.i}
+Dominant: ${trait.eScore > trait.iScore ? trait.e : trait.i} (Strength: ${trait.strength}%)
 `).join('\n')}
 
 This weighted calculation ensures that longer, more comprehensive tests have a greater influence on your final type determination.
