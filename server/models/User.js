@@ -240,22 +240,45 @@ userSchema.methods.getPublicProfile = function() {
 };
 
 // Add method to get profile sections
-userSchema.methods.getProfileSections = function() {
+userSchema.methods.getProfileSections = async function() {
+  const TestResult = mongoose.model('TestResult');
+  const weightedResult = await TestResult.calculateWeightedType(this._id);
+
   const defaultSections = {
     personality: {
       id: 'personality',
-      title: 'Personality',
+      title: `${this.mbtiType} - ${getPersonalityTitle(this.mbtiType)}`,
       type: 'default',
-      content: this.personalityTraits.map((trait, index) => ({
-        id: `trait-${index}`,
-        title: trait.trait,
-        value: trait.strength,
-        contentType: 'progress'
-      }))
+      content: [
+        {
+          id: 'overview',
+          title: 'MBTI Overview',
+          description: `Your personality type is ${this.mbtiType}, determined through multiple assessments with weighted calculations.`,
+          contentType: 'text'
+        },
+        ...(weightedResult ? [{
+          id: 'test-breakdown',
+          title: 'Test Results Breakdown',
+          description: formatTestBreakdown(weightedResult),
+          contentType: 'text'
+        }] : []),
+        ...(weightedResult ? weightedResult.testBreakdown.map((test, index) => ({
+          id: `test-${index}`,
+          title: `${test.category.toUpperCase()} Test`,
+          description: `Type: ${test.type} | Weight: ${Math.round(test.weight * 100)}% | Date: ${new Date(test.date).toLocaleDateString()}`,
+          contentType: 'text'
+        })) : []),
+        ...this.personalityTraits.map((trait, index) => ({
+          id: `trait-${index}`,
+          title: trait.trait,
+          value: trait.strength,
+          contentType: 'progress'
+        }))
+      ]
     },
     interests: {
       id: 'interests',
-      title: 'Interests',
+      title: 'Interests & Activities',
       type: 'default',
       content: this.interests.map((interest, index) => ({
         id: `interest-${index}`,
@@ -265,7 +288,7 @@ userSchema.methods.getProfileSections = function() {
     },
     languages: {
       id: 'languages',
-      title: 'Languages',
+      title: 'Language Proficiency',
       type: 'default',
       content: this.languages.map((lang, index) => ({
         id: `lang-${index}`,
@@ -276,7 +299,7 @@ userSchema.methods.getProfileSections = function() {
     },
     achievements: {
       id: 'achievements',
-      title: 'Achievements',
+      title: 'Achievements & Milestones',
       type: 'default',
       content: this.achievements.map((achievement, index) => ({
         id: `achievement-${index}`,
@@ -302,6 +325,51 @@ userSchema.methods.getProfileSections = function() {
 
   return allSections;
 };
+
+// Helper function to get personality type title
+function getPersonalityTitle(mbtiType) {
+  const titles = {
+    'INTJ': 'Architect & Strategic Thinker',
+    'INTP': 'Logical & Innovative Analyst',
+    'ENTJ': 'Dynamic & Strategic Leader',
+    'ENTP': 'Innovative & Versatile Explorer',
+    'INFJ': 'Insightful & Empathetic Guide',
+    'INFP': 'Creative & Authentic Idealist',
+    'ENFJ': 'Charismatic & Inspiring Leader',
+    'ENFP': 'Enthusiastic & Creative Catalyst',
+    'ISTJ': 'Reliable & Systematic Organizer',
+    'ISFJ': 'Dedicated & Nurturing Protector',
+    'ESTJ': 'Efficient & Practical Manager',
+    'ESFJ': 'Supportive & Social Harmonizer',
+    'ISTP': 'Skilled & Adaptable Craftsperson',
+    'ISFP': 'Artistic & Compassionate Creator',
+    'ESTP': 'Energetic & Practical Doer',
+    'ESFP': 'Spontaneous & Engaging Performer'
+  };
+  return titles[mbtiType] || 'Personality Type';
+}
+
+// Helper function to format test breakdown
+function formatTestBreakdown(weightedResult) {
+  const traits = [
+    { name: 'Extroversion-Introversion', e: 'E', i: 'I', eScore: weightedResult.percentages.E, iScore: weightedResult.percentages.I },
+    { name: 'Sensing-Intuition', e: 'S', i: 'N', eScore: weightedResult.percentages.S, iScore: weightedResult.percentages.N },
+    { name: 'Thinking-Feeling', e: 'T', i: 'F', eScore: weightedResult.percentages.T, iScore: weightedResult.percentages.F },
+    { name: 'Judging-Perceiving', e: 'J', i: 'P', eScore: weightedResult.percentages.J, iScore: weightedResult.percentages.P }
+  ];
+
+  return `
+Your personality type is calculated using a weighted average of all your test results:
+
+${traits.map(trait => `
+${trait.name}:
+${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
+Primary trait: ${trait.eScore > trait.iScore ? trait.e : trait.i}
+`).join('\n')}
+
+This weighted calculation ensures that longer, more comprehensive tests have a greater influence on your final type determination.
+  `.trim();
+}
 
 const User = mongoose.model('User', userSchema);
 

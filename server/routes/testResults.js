@@ -131,23 +131,40 @@ router.post('/', auth, async (req, res) => {
       savedResult = await testResult.save();
     }
 
-    // Update user's MBTI type if this is the most comprehensive test
-    if (testCategory === 'mbti-100' || 
-       (testCategory === 'mbti-24' && !await TestResult.findOne({ user: req.user.userId, testCategory: 'mbti-100' })) ||
-       (testCategory === 'mbti-8' && !await TestResult.findOne({ user: req.user.userId, testCategory: { $in: ['mbti-24', 'mbti-100'] } }))) {
-      console.log('Updating user MBTI type:', {
+    // Calculate weighted personality type
+    const weightedResult = await TestResult.calculateWeightedType(req.user.userId);
+    
+    if (weightedResult) {
+      console.log('Updating user MBTI type with weighted calculation:', {
         userId: req.user.userId,
-        newType: req.body.result.type
+        oldType: req.body.result.type,
+        newType: weightedResult.type,
+        testBreakdown: weightedResult.testBreakdown
       });
+
+      // Update user's MBTI type with weighted result
       await User.findByIdAndUpdate(req.user.userId, {
-        mbtiType: req.body.result.type
+        mbtiType: weightedResult.type,
+        personalityTraits: [
+          { trait: 'Extroversion-Introversion', strength: weightedResult.percentages.E },
+          { trait: 'Sensing-Intuition', strength: weightedResult.percentages.S },
+          { trait: 'Thinking-Feeling', strength: weightedResult.percentages.T },
+          { trait: 'Judging-Perceiving', strength: weightedResult.percentages.J }
+        ]
       });
+
+      // Add weighted calculation to the response
+      savedResult = {
+        ...savedResult.toObject(),
+        weightedResult
+      };
     }
 
     console.log('Successfully saved test result:', {
       resultId: savedResult._id,
       testCategory,
-      isNew: !existingResult
+      isNew: !existingResult,
+      hasWeightedResult: !!weightedResult
     });
     
     return res.status(existingResult ? 200 : 201).json(savedResult);
