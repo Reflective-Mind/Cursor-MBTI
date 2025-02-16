@@ -283,6 +283,12 @@ router.get('/status/online', auth, async (req, res) => {
 // Add new section
 router.post('/:userId/sections', auth, async (req, res) => {
   try {
+    console.log('Add section request:', {
+      userId: req.params.userId,
+      title: req.body.title,
+      type: req.body.type
+    });
+
     if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ message: 'Not authorized to modify this profile' });
     }
@@ -292,32 +298,56 @@ router.post('/:userId/sections', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Validate input
+    if (!req.body.title || typeof req.body.title !== 'string' || req.body.title.trim().length === 0) {
+      return res.status(400).json({ message: 'Valid section title is required' });
+    }
+
     // Check section limits
-    const totalSections = user.profileSections.length + 
-      Object.values(user.defaultSections).filter(s => s.isVisible).length;
+    const currentSections = user.profileSections.length;
+    const maxSections = user.sectionLimits?.maxMainSections || 10;
     
-    if (totalSections >= user.sectionLimits.maxMainSections) {
+    if (currentSections >= maxSections) {
       return res.status(400).json({ 
-        message: `Cannot add more than ${user.sectionLimits.maxMainSections} sections` 
+        message: `Cannot add more than ${maxSections} sections`,
+        currentCount: currentSections,
+        maxAllowed: maxSections
       });
     }
 
+    // Create new section with unique ID
     const newSection = {
       id: new mongoose.Types.ObjectId().toString(),
-      title: req.body.title || 'New Section',
-      order: totalSections,
-      isVisible: true,
+      title: req.body.title.trim(),
       type: 'custom',
-      content: []
+      content: [],
+      order: currentSections,
+      isVisible: true
     };
 
+    console.log('Creating new section:', newSection);
+
+    // Add section
     user.profileSections.push(newSection);
     await user.save();
 
-    res.json(newSection);
+    console.log('Section created successfully:', {
+      sectionId: newSection.id,
+      title: newSection.title
+    });
+
+    res.status(201).json(newSection);
   } catch (error) {
-    console.error('Error adding section:', error);
-    res.status(500).json({ message: 'Error adding section', details: error.message });
+    console.error('Error adding section:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.params.userId,
+      body: req.body
+    });
+    res.status(500).json({ 
+      message: 'Error adding section', 
+      details: error.message 
+    });
   }
 });
 
@@ -369,6 +399,11 @@ router.patch('/:userId/sections/:sectionId', auth, async (req, res) => {
 // Delete section
 router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
   try {
+    console.log('Delete section request:', {
+      userId: req.params.userId,
+      sectionId: req.params.sectionId
+    });
+
     if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ message: 'Not authorized to modify this profile' });
     }
@@ -378,15 +413,24 @@ router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Only protect the main personality overview section
-    if (req.params.sectionId === 'personality') {
+    // Find the section
+    const section = user.profileSections.find(s => s.id === req.params.sectionId);
+    console.log('Found section:', section);
+
+    if (!section) {
+      return res.status(404).json({ message: 'Section not found' });
+    }
+
+    // Prevent deletion of the main personality overview
+    if (section.type === 'personality' && section.id === 'personality') {
       return res.status(400).json({ message: 'Cannot delete the main personality section' });
     }
 
-    // Allow deleting any other section, including AI story
+    // Remove the section
     user.profileSections = user.profileSections.filter(s => s.id !== req.params.sectionId);
     await user.save();
 
+    console.log('Section deleted successfully');
     res.json({ message: 'Section deleted successfully' });
   } catch (error) {
     console.error('Error deleting section:', error);
@@ -479,6 +523,12 @@ router.patch('/:userId/sections/:sectionId/content/:contentId', auth, async (req
 // Delete content
 router.delete('/:userId/sections/:sectionId/content/:contentId', auth, async (req, res) => {
   try {
+    console.log('Delete content request:', {
+      userId: req.params.userId,
+      sectionId: req.params.sectionId,
+      contentId: req.params.contentId
+    });
+
     if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ message: 'Not authorized to modify this profile' });
     }
@@ -488,14 +538,28 @@ router.delete('/:userId/sections/:sectionId/content/:contentId', auth, async (re
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Find the section
     const section = user.profileSections.find(s => s.id === req.params.sectionId);
     if (!section) {
       return res.status(404).json({ message: 'Section not found' });
     }
 
+    // Prevent deletion of the main personality overview content
+    if (section.type === 'personality' && section.id === 'personality' && 
+        section.content.length === 1 && section.content[0].id === 'overview') {
+      return res.status(400).json({ message: 'Cannot delete the main personality overview' });
+    }
+
+    // Remove the content
+    const contentExists = section.content.some(c => c.id === req.params.contentId);
+    if (!contentExists) {
+      return res.status(404).json({ message: 'Content not found' });
+    }
+
     section.content = section.content.filter(c => c.id !== req.params.contentId);
     await user.save();
 
+    console.log('Content deleted successfully');
     res.json({ message: 'Content deleted successfully' });
   } catch (error) {
     console.error('Error deleting content:', error);
@@ -520,6 +584,11 @@ router.put('/me', auth, async (req, res) => {
 // Generate AI Story
 router.post('/:userId/generate-story', auth, async (req, res) => {
   try {
+    console.log('Generate AI story request:', {
+      userId: req.params.userId,
+      timestamp: new Date().toISOString()
+    });
+
     if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -529,8 +598,25 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Check for test results
+    const TestResult = mongoose.model('TestResult');
+    const results = await TestResult.find({ user: user._id });
+    if (!results || results.length === 0) {
+      return res.status(400).json({ message: 'No test results available for analysis' });
+    }
+
+    console.log('Generating AI story with test results:', {
+      resultCount: results.length,
+      latestType: results[0]?.result?.type
+    });
+
     // Generate the AI story
     const story = await user.generateAIStory();
+    if (!story) {
+      throw new Error('Failed to generate AI story');
+    }
+
+    console.log('AI story generated successfully');
     
     // Create a unique ID for the new section
     const timestamp = Date.now();
@@ -539,11 +625,11 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
     // Create new section with the story
     const newSection = {
       id: sectionId,
-      title: 'Your Personality Deep Dive',
-      type: 'personality',
+      title: `AI Analysis (${new Date().toLocaleDateString()})`,
+      type: 'ai-analysis',
       content: [{
         id: `story-${timestamp}`,
-        title: 'AI Generated Analysis',
+        title: 'Personality Deep Dive',
         description: story,
         contentType: 'text'
       }],
@@ -551,17 +637,31 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
       isVisible: true
     };
 
+    console.log('Creating new section:', {
+      sectionId,
+      contentLength: story.length
+    });
+
     // Add the new section
     user.profileSections.push(newSection);
     await user.save();
+
+    console.log('Section saved successfully');
 
     res.json({ 
       message: 'AI story generated successfully',
       section: newSection
     });
   } catch (error) {
-    console.error('Error generating AI story:', error);
-    res.status(500).json({ message: 'Error generating AI story', details: error.message });
+    console.error('Error generating AI story:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.params.userId
+    });
+    res.status(500).json({ 
+      message: 'Error generating AI story', 
+      details: error.message 
+    });
   }
 });
 
