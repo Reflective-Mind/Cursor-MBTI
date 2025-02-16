@@ -399,20 +399,31 @@ router.patch('/:userId/sections/:sectionId', auth, async (req, res) => {
 // Delete section
 router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
   try {
-    const { userId, sectionId } = req.params;
-    
+    console.log('Delete section request:', {
+      userId: req.params.userId,
+      sectionId: req.params.sectionId,
+      authUserId: req.user.userId
+    });
+
     // Verify user authorization
-    if (req.user.id !== userId) {
+    if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ error: 'Not authorized to modify this profile' });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(req.params.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     // Find section index
-    const sectionIndex = user.profileSections.findIndex(section => section.id === sectionId);
+    const sectionIndex = user.profileSections.findIndex(section => section.id === req.params.sectionId);
+    
+    console.log('Section search result:', {
+      sectionFound: sectionIndex !== -1,
+      sectionIndex,
+      totalSections: user.profileSections.length
+    });
+
     if (sectionIndex === -1) {
       return res.status(404).json({ error: 'Section not found' });
     }
@@ -428,12 +439,24 @@ router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
     await user.save();
 
     // Get updated sections
-    const weightedResult = await TestResult.calculateWeightedType(userId);
-    const updatedSections = await user.getProfileSections(weightedResult);
+    const updatedSections = await user.getProfileSections();
 
-    res.json({ sections: updatedSections });
+    console.log('Section deleted successfully:', {
+      deletedSectionId: req.params.sectionId,
+      remainingSections: updatedSections.length
+    });
+
+    res.json({ 
+      message: 'Section deleted successfully',
+      sections: updatedSections 
+    });
   } catch (error) {
-    console.error('Error deleting section:', error);
+    console.error('Error deleting section:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.params.userId,
+      sectionId: req.params.sectionId
+    });
     res.status(500).json({ error: 'Failed to delete section' });
   }
 });
@@ -584,38 +607,51 @@ router.put('/me', auth, async (req, res) => {
 // Generate AI Story
 router.post('/:userId/generate-story', auth, async (req, res) => {
   try {
-    const { userId } = req.params;
+    console.log('Generate story request:', {
+      userId: req.params.userId,
+      authUserId: req.user.userId
+    });
 
     // Verify user authorization
-    if (req.user.id !== userId) {
+    if (req.params.userId !== req.user.userId) {
       return res.status(403).json({ error: 'Not authorized to generate story for this user' });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(req.params.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     // Get test results and calculate weighted type
-    const weightedResult = await TestResult.calculateWeightedType(userId);
+    const weightedResult = await TestResult.calculateWeightedType(req.params.userId);
     if (!weightedResult) {
       return res.status(400).json({ error: 'No test results found' });
     }
 
+    console.log('Generating AI story with weighted result:', {
+      type: weightedResult.type,
+      hasTraitStrengths: !!weightedResult.traitStrengths,
+      hasTestBreakdown: !!weightedResult.testBreakdown
+    });
+
     // Generate AI story
-    const story = await user.generateAIStory(weightedResult);
+    const story = await user.generateAIStory();
     if (!story) {
       return res.status(500).json({ error: 'Failed to generate story' });
     }
 
+    console.log('AI story generated successfully:', {
+      storyLength: story.length
+    });
+
     // Create new section with unique ID
-    const newSectionId = new mongoose.Types.ObjectId().toString();
+    const timestamp = Date.now();
     const newSection = {
-      id: newSectionId,
-      title: 'Your Personality Deep Dive',
-      type: 'ai_analysis',
+      id: `ai-story-${timestamp}`,
+      title: `Your Personality Deep Dive (${new Date().toLocaleDateString()})`,
+      type: 'custom',
       content: [{
-        id: new mongoose.Types.ObjectId().toString(),
+        id: `story-${timestamp}`,
         title: 'AI Generated Analysis',
         description: story,
         contentType: 'text'
@@ -628,12 +664,29 @@ router.post('/:userId/generate-story', auth, async (req, res) => {
     user.profileSections.push(newSection);
     await user.save();
 
+    console.log('New section added:', {
+      sectionId: newSection.id,
+      contentId: newSection.content[0].id
+    });
+
     // Get updated sections
-    const updatedSections = await user.getProfileSections(weightedResult);
-    res.json({ sections: updatedSections });
+    const updatedSections = await user.getProfileSections();
+
+    res.json({ 
+      message: 'Story generated successfully',
+      sections: updatedSections,
+      newSection: newSection
+    });
   } catch (error) {
-    console.error('Error generating story:', error);
-    res.status(500).json({ error: 'Failed to generate story' });
+    console.error('Error generating story:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.params.userId
+    });
+    res.status(500).json({ 
+      error: 'Failed to generate story',
+      details: error.message
+    });
   }
 });
 
