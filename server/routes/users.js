@@ -517,246 +517,56 @@ router.put('/me', auth, async (req, res) => {
   }
 });
 
-// Generate AI story
+// Generate AI Story
 router.post('/:userId/generate-story', auth, async (req, res) => {
   try {
-    console.log('Generate story request:', {
-      paramsUserId: req.params.userId,
-      authUserId: req.user.userId,
-      timestamp: new Date().toISOString(),
-      headers: req.headers,
-      mistralInitialized: !!mistralClient,
-      envVars: {
-        hasApiKey: !!process.env.MISTRAL_API_KEY,
-        apiKeyLength: process.env.MISTRAL_API_KEY?.length,
-        nodeEnv: process.env.NODE_ENV
-      }
-    });
-
-    // Initialize Mistral client if not already initialized
-    if (!mistralClient) {
-      console.log('Mistral client not initialized, attempting initialization...');
-      const mistralModule = await import('@mistralai/mistralai/src/client.js');
-      mistralClient = new mistralModule.default(process.env.MISTRAL_API_KEY);
-    }
-
-    if (!mistralClient) {
-      const error = new Error('Failed to initialize Mistral client');
-      error.details = {
-        hasApiKey: !!process.env.MISTRAL_API_KEY,
-        apiKeyLength: process.env.MISTRAL_API_KEY?.length,
-        envFile: path.join(__dirname, '../.env')
-      };
-      throw error;
-    }
-
-    // Get all user's test results with detailed logging
-    console.log('Searching for test results with query:', {
-      user: req.params.userId
-    });
-
-    const testResults = await TestResult.find({ user: req.params.userId })
-      .sort({ createdAt: -1 });
-
-    console.log('Found test results:', {
-      count: testResults?.length,
-      results: testResults.map(result => ({
-        id: result._id,
-        type: result.result?.type,
-        testCategory: result.testCategory,
-        hasPercentages: !!result.result?.percentages,
-        hasDominantTraits: !!result.result?.dominantTraits,
-        createdAt: result.createdAt
-      }))
-    });
-
-    if (!testResults || testResults.length === 0) {
-      return res.status(404).json({ 
-        message: 'No test results found. Please complete an MBTI test first.',
-        userId: req.params.userId
-      });
-    }
-
-    // Get user info for personalization
     const user = await User.findById(req.params.userId);
     if (!user) {
-      throw new Error('User not found');
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    // Prepare test results summary
-    const testBreakdown = testResults.map(test => ({
-      category: test.testCategory,
-      type: test.result.type,
-      percentages: test.result.percentages,
-      dominantTraits: test.result.dominantTraits,
-      date: test.createdAt
-    }));
-
-    // Calculate average trait scores across all tests
-    const averageTraits = {
-      E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0,
-      count: testResults.length
-    };
-
-    testResults.forEach(test => {
-      if (test.result.percentages) {
-        Object.entries(test.result.percentages).forEach(([trait, value]) => {
-          averageTraits[trait] += value;
-        });
-      }
-    });
-
-    Object.keys(averageTraits).forEach(trait => {
-      if (trait !== 'count') {
-        averageTraits[trait] = Math.round(averageTraits[trait] / averageTraits.count);
-      }
-    });
-
-    // Prepare the prompt for AI
-    const prompt = `As an advanced MBTI analyst, create a unique and personalized analysis for this user based on their test results:
-
-Test History:
-${testBreakdown.map(test => `${test.category}: ${test.type} (Taken: ${new Date(test.date).toLocaleDateString()})`).join('\n')}
-
-Average Trait Percentages:
-${Object.entries(averageTraits)
-  .filter(([key]) => key !== 'count')
-  .map(([trait, value]) => `${trait}: ${value}%`)
-  .join('\n')}
-
-Latest Test Dominant Traits:
-${Object.entries(testResults[0].result.dominantTraits || {}).map(([category, trait]) => `${category}: ${trait}`).join('\n')}
-
-Create a professional and personal showcase following this exact structure:
-
-1. Profile Title
-${testResults[0].result.type} - Professional & Personal Overview
-
-2. Summary Introduction
-• Summarize their core MBTI traits based on their specific test scores
-• Explain how their individual scores reflect their thought processes and behavior
-• Focus on their unique combination of traits and percentages
-
-3. Key Personality Strengths (3-4 bullet points)
-• Base each strength on their highest scoring traits from the test data
-• Include specific percentages and explain why they are advantageous
-• If any traits are balanced (close to 50%), highlight this as a unique strength
-
-4. Areas for Growth (2-3 bullet points)
-• Provide constructive improvement suggestions based on their actual test scores
-• Make recommendations specific to their MBTI type and score patterns
-• Focus on actionable professional development opportunities
-
-5. Test Results Analysis
-• Compare results across all tests taken (if multiple tests exist)
-• Identify consistent patterns and any variations in scores
-• Explain what their score trends might indicate about their type development
-
-6. How Others Can Best Work With Them
-• Provide specific communication preferences based on their trait scores
-• Include collaboration strategies that leverage their strongest traits
-• Add practical tips for effective teamwork based on their type
-
-7. Final Summary for Self-Presentation
-Create a concise 1-2 sentence professional summary that captures their key traits and working style.
-
-Important Guidelines:
-- Base all insights strictly on their test data and scores
-- Keep the tone professional yet engaging
-- Focus on practical workplace and personal development applications
-- Avoid any fictional elements or storytelling
-- Do not make assumptions about gender or personal characteristics
-- Use specific percentages and test results to support each point
-- Make the analysis unique to their individual score pattern
-- Ensure all content is suitable for professional networking
-
-The showcase should be data-driven, practical, and immediately useful for professional development and team collaboration.`;
-
-    console.log('Generating personality showcase with Mistral AI...');
-    
-    // Generate analysis using Mistral AI
-    const response = await mistralClient.chat({
-      model: "mistral-tiny",
-      messages: [
-        { 
-          role: "system", 
-          content: "You are an expert MBTI analyst and professional development consultant. Your role is to create highly personalized, data-driven personality analyses based on actual test results. Focus on practical workplace applications and professional development. Use clear, structured formatting with bullet points. Avoid any fictional elements or assumptions." 
-        },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 1500,
-      top_p: 0.9
-    });
-
-    console.log('Mistral AI response received:', {
-      hasChoices: !!response?.choices,
-      firstChoice: !!response?.choices?.[0],
-      hasMessage: !!response?.choices?.[0]?.message
-    });
-
-    if (!response?.choices?.[0]?.message?.content) {
-      throw new Error('Invalid AI response format');
+    // Check if user has test results
+    const TestResult = mongoose.model('TestResult');
+    const results = await TestResult.find({ user: user._id });
+    if (!results || results.length === 0) {
+      return res.status(400).json({ message: 'No test results available' });
     }
 
-    const story = response.choices[0].message.content;
-
-    // Check if AI Analysis section already exists
-    let aiSection = user.profileSections.find(section => section.type === 'ai_analysis');
+    // Generate story
+    const story = await user.generateAIStory();
     
-    if (aiSection) {
-      // Update existing section
-      aiSection.content = [{
-        id: new mongoose.Types.ObjectId().toString(),
-        title: `${testResults[0].result.type} Personality Showcase`,
+    // Create or update story section
+    const storySection = {
+      id: 'personality-story',
+      title: 'Your Personality Story',
+      type: 'personality',
+      content: [{
+        id: 'story',
+        title: 'Detailed Analysis',
         description: story,
         contentType: 'text'
-      }];
+      }],
+      order: 1,
+      isVisible: true
+    };
+
+    // Update user's profile sections
+    const existingSectionIndex = user.profileSections.findIndex(s => s.id === 'personality-story');
+    if (existingSectionIndex >= 0) {
+      user.profileSections[existingSectionIndex] = storySection;
     } else {
-      // Create new section
-      aiSection = {
-        id: new mongoose.Types.ObjectId().toString(),
-        title: `${testResults[0].result.type} Personality Showcase`,
-        order: user.profileSections.length,
-        isVisible: true,
-        type: 'ai_analysis',
-        content: [{
-          id: new mongoose.Types.ObjectId().toString(),
-          title: `${testResults[0].result.type} Personality Showcase`,
-          description: story,
-          contentType: 'text'
-        }]
-      };
-      user.profileSections.push(aiSection);
+      user.profileSections.push(storySection);
     }
 
     await user.save();
-    console.log('Personality showcase saved to profile:', {
-      sectionId: aiSection.id,
-      contentLength: story.length,
-      type: testResults[0].result.type,
-      testCount: testResults.length
-    });
 
     res.json({ 
-      story,
-      section: aiSection,
-      testBreakdown: testBreakdown.map(test => ({
-        category: test.category,
-        type: test.type,
-        date: test.date
-      }))
+      message: 'Story generated successfully',
+      section: storySection
     });
   } catch (error) {
-    console.error('Error generating personality showcase:', {
-      error: error.message,
-      stack: error.stack,
-      userId: req.params.userId
-    });
-    res.status(500).json({ 
-      message: 'Error generating personality showcase',
-      details: error.message
-    });
+    console.error('Error generating story:', error);
+    res.status(500).json({ message: 'Error generating personality story' });
   }
 });
 

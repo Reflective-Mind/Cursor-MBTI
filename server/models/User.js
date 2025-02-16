@@ -192,8 +192,8 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
       throw error;
     }
 
-    // Ensure password is a string
-    const passwordString = candidatePassword.toString();
+    // Ensure password is a string and trim whitespace
+    const passwordString = candidatePassword.toString().trim();
     
     // Log before bcrypt comparison
     console.log('Attempting bcrypt compare:', {
@@ -204,7 +204,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
       timestamp: new Date().toISOString()
     });
 
-    // Perform comparison
+    // Perform comparison with bcrypt
     const isMatch = await bcrypt.compare(passwordString, this.password);
     
     // Log result
@@ -233,7 +233,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
     // Rethrow with more context
     const enhancedError = new Error(`Password comparison failed: ${error.message}`);
     enhancedError.originalError = error;
-    enhancedError.code = error.code;
+    enhancedError.code = error.code || 'PASSWORD_COMPARISON_ERROR';
     throw enhancedError;
   }
 };
@@ -296,18 +296,6 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
         title: 'Personality Overview',
         description: weightedResult ? generatePersonalityOverview(weightedResult) : 'Take a personality test to see your results',
         contentType: 'text'
-      },
-      {
-        id: 'trait-strengths',
-        title: 'Trait Strengths',
-        description: formatTraitStrengths(weightedResult),
-        contentType: 'traits'
-      },
-      {
-        id: 'test-breakdown',
-        title: 'Test Results Breakdown',
-        description: formatTestBreakdown(weightedResult),
-        contentType: 'breakdown'
       }
     ],
     order: this.defaultSections?.personality?.order || 0,
@@ -318,7 +306,7 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
 };
 
 function generatePersonalityOverview(weightedResult) {
-  const { type, dominantTraits, percentages, isBalanced } = weightedResult;
+  const { type, dominantTraits, percentages, testBreakdown } = weightedResult;
   
   // Get personality descriptions
   const descriptions = {
@@ -332,11 +320,31 @@ function generatePersonalityOverview(weightedResult) {
     P: 'Perceiving - Prefers flexibility and spontaneity'
   };
 
+  // Calculate total questions answered
+  const totalQuestions = testBreakdown.reduce((sum, test) => {
+    const questionCounts = {
+      'mbti-100': 100,
+      'mbti-24': 24,
+      'mbti-8': 8
+    };
+    return sum + questionCounts[test.category];
+  }, 0);
+
   // Generate overview text
-  let overview = `Based on your weighted test results, you are ${isBalanced ? 'a balanced' : 'primarily'} ${type} personality type.\n\n`;
-  overview += 'Your dominant traits are:\n';
+  let overview = `Based on your combined test results (${totalQuestions} questions total), you are a ${type} personality type.\n\n`;
   
-  // Add dominant traits with percentages
+  if (testBreakdown.length > 1) {
+    overview += 'Your results are based on:\n';
+    testBreakdown.forEach(test => {
+      const date = new Date(test.date).toLocaleDateString();
+      overview += `• ${test.category.toUpperCase()} test (${Math.round(test.effectiveWeight)}% contribution) - Taken on ${date}\n`;
+    });
+    overview += '\n';
+  }
+
+  overview += 'Your personality traits are:\n';
+  
+  // Add traits with percentages
   Object.entries(dominantTraits).forEach(([category, trait]) => {
     const traitLetter = trait[0];
     const percentage = percentages[traitLetter];
@@ -346,55 +354,138 @@ function generatePersonalityOverview(weightedResult) {
   return overview;
 }
 
-function formatTraitStrengths(weightedResult) {
-  if (!weightedResult || !weightedResult.traitStrengths || !weightedResult.percentages) {
-    return [];
-  }
-
-  const { traitStrengths, percentages } = weightedResult;
+// Add method to generate AI story
+userSchema.methods.generateAIStory = async function() {
+  const TestResult = mongoose.model('TestResult');
+  const results = await TestResult.find({ user: this._id }).sort({ createdAt: -1 });
   
-  return [
-    {
-      trait1: { letter: 'E', score: percentages.E || 0 },
-      trait2: { letter: 'I', score: percentages.I || 0 },
-      strength: traitStrengths.EI || 0
-    },
-    {
-      trait1: { letter: 'S', score: percentages.S || 0 },
-      trait2: { letter: 'N', score: percentages.N || 0 },
-      strength: traitStrengths.SN || 0
-    },
-    {
-      trait1: { letter: 'T', score: percentages.T || 0 },
-      trait2: { letter: 'F', score: percentages.F || 0 },
-      strength: traitStrengths.TF || 0
-    },
-    {
-      trait1: { letter: 'J', score: percentages.J || 0 },
-      trait2: { letter: 'P', score: percentages.P || 0 },
-      strength: traitStrengths.JP || 0
-    }
-  ];
-}
-
-function formatTestBreakdown(weightedResult) {
-  if (!weightedResult || !weightedResult.testBreakdown) {
-    return [];
+  if (!results || results.length === 0) {
+    throw new Error('No test results available');
   }
 
-  return weightedResult.testBreakdown.map(test => ({
-    category: test.category || '',
-    type: test.type || '',
-    baseWeight: test.baseWeight || 0,
-    effectiveWeight: test.effectiveWeight || 0,
-    date: test.date || new Date(),
-    percentages: test.percentages || {
-      E: 0, I: 0,
-      S: 0, N: 0,
-      T: 0, F: 0,
-      J: 0, P: 0
+  // Analyze answers for each category
+  const categoryAnalysis = {};
+  const categories = ['EI', 'SN', 'TF', 'JP'];
+  
+  for (const category of categories) {
+    categoryAnalysis[category] = await this.analyzeAnswersForCategory(results, category);
+  }
+
+  // Get weighted type and trait strengths
+  const weightedResult = await TestResult.calculateWeightedType(results);
+  const { type, traitStrengths } = weightedResult;
+
+  // Calculate total questions answered
+  const totalQuestions = results.reduce((sum, result) => {
+    return sum + (result.answers ? Object.keys(result.answers).length : 0);
+  }, 0);
+
+  // Generate comprehensive story
+  let story = `Based on your ${totalQuestions} answered questions across ${results.length} test(s), here's a detailed analysis of your personality type ${type}:\n\n`;
+
+  // Add trait analysis
+  for (const category of categories) {
+    const traits = category.split('');
+    const strength = traitStrengths[category];
+    const analysis = categoryAnalysis[category];
+    
+    story += `\n${traits[0]}/${traits[1]} Dimension (${Math.abs(strength)}% ${strength > 0 ? traits[0] : traits[1]}):\n`;
+    story += analysis + '\n';
+  }
+
+  // Add test breakdown
+  story += '\n\nTest History:\n';
+  for (const result of results) {
+    const questionCount = result.answers ? Object.keys(result.answers).length : 0;
+    const date = new Date(result.createdAt).toLocaleDateString();
+    story += `- ${result.testCategory} (${questionCount} questions) taken on ${date}: ${result.result.type}\n`;
+  }
+
+  // Add recommendations
+  story += '\n\nRecommendations for Growth:\n';
+  for (const category of categories) {
+    const traits = category.split('');
+    const strength = traitStrengths[category];
+    const dominantTrait = strength > 0 ? traits[0] : traits[1];
+    const recessiveTrait = strength > 0 ? traits[1] : traits[0];
+    
+    if (Math.abs(strength) > 70) {
+      story += `- Consider developing your ${recessiveTrait} side to balance your strong ${dominantTrait} preference\n`;
+    } else if (Math.abs(strength) < 30) {
+      story += `- Your balanced ${traits[0]}/${traits[1]} preference allows you to adapt well. Continue developing both aspects\n`;
     }
-  }));
+  }
+
+  return story;
+};
+
+userSchema.methods.analyzeAnswersForCategory = async function(results, category) {
+  const traits = category.split('');
+  let analysis = '';
+  
+  // Collect all answers for this category
+  const categoryAnswers = results.flatMap(result => {
+    return Object.entries(result.answers || {})
+      .filter(([questionId]) => questionId.startsWith(category))
+      .map(([_, answer]) => answer);
+  });
+
+  if (categoryAnswers.length === 0) {
+    return `Not enough data to analyze ${traits[0]}/${traits[1]} preference.`;
+  }
+
+  // Calculate preference strength
+  const traitCount = categoryAnswers.reduce((count, answer) => {
+    return count + (answer === traits[0] ? 1 : -1);
+  }, 0);
+
+  const percentage = (traitCount / categoryAnswers.length) * 100;
+  const strength = Math.abs(percentage);
+  const dominantTrait = percentage > 0 ? traits[0] : traits[1];
+  
+  // Generate trait-specific analysis
+  switch (category) {
+    case 'EI':
+      if (dominantTrait === 'E') {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Extraversion. Your responses indicate you gain energy from social interaction and external engagement. You tend to think out loud and process information through discussion.`;
+      } else {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Introversion. Your responses suggest you recharge through solitude and internal reflection. You prefer to process information internally before sharing your thoughts.`;
+      }
+      break;
+      
+    case 'SN':
+      if (dominantTrait === 'S') {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Sensing. Your answers indicate you focus on concrete facts and practical applications. You trust experience and pay attention to details in the present moment.`;
+      } else {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Intuition. Your responses suggest you look for patterns and possibilities. You enjoy thinking about the future and making connections between concepts.`;
+      }
+      break;
+      
+    case 'TF':
+      if (dominantTrait === 'T') {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Thinking. Your answers indicate you make decisions based on logical analysis and objective criteria. You value consistency and tend to look at situations impartially.`;
+      } else {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Feeling. Your responses suggest you make decisions based on personal values and how they affect others. You consider the human element in situations.`;
+      }
+      break;
+      
+    case 'JP':
+      if (dominantTrait === 'J') {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Judging. Your answers indicate you prefer structure and planning. You like to have things decided and enjoy completing tasks systematically.`;
+      } else {
+        analysis = `You show a ${getStrengthLevel(strength)} preference for Perceiving. Your responses suggest you prefer flexibility and spontaneity. You like to keep options open and adapt to new information as it comes.`;
+      }
+      break;
+  }
+
+  return analysis;
+};
+
+function getStrengthLevel(percentage) {
+  if (percentage >= 70) return 'very strong';
+  if (percentage >= 50) return 'strong';
+  if (percentage >= 30) return 'moderate';
+  return 'slight';
 }
 
 const User = mongoose.model('User', userSchema);

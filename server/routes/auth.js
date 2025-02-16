@@ -161,155 +161,140 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
+    // Find user - convert email to lowercase for case-insensitive comparison
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      console.log('User not found:', email.toLowerCase());
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    console.log('Found user:', {
+      id: user._id,
+      email: user.email,
+      hasPassword: !!user.password,
+      mbtiType: user.mbtiType,
+      status: user.status,
+      timestamp: new Date().toISOString()
+    });
+
+    // Check password
     try {
-      // Find user - convert email to lowercase for case-insensitive comparison
-      const user = await User.findOne({ email: email.toLowerCase() });
-      if (!user) {
-        console.log('User not found:', email.toLowerCase());
+      const isMatch = await user.comparePassword(password);
+      console.log('Password check result:', {
+        userId: user._id,
+        isMatch: isMatch,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!isMatch) {
+        console.log('Invalid password for user:', email.toLowerCase());
         return res.status(401).json({ message: 'Invalid credentials' });
       }
-
-      console.log('Found user:', {
-        id: user._id,
-        email: user.email,
-        hasPassword: !!user.password,
-        mbtiType: user.mbtiType,
-        status: user.status,
-        timestamp: new Date().toISOString()
-      });
-
-      // Check password
-      try {
-        const isMatch = await user.comparePassword(password);
-        console.log('Password check result:', {
-          userId: user._id,
-          isMatch: isMatch,
-          timestamp: new Date().toISOString()
-        });
-
-        if (!isMatch) {
-          console.log('Invalid password for user:', email.toLowerCase());
-          return res.status(401).json({ message: 'Invalid credentials' });
-        }
-      } catch (passwordError) {
-        console.error('Password comparison error:', {
-          userId: user._id,
-          email: user.email,
-          error: {
-            code: passwordError.code,
-            message: passwordError.message,
-            stack: passwordError.stack
-          },
-          timestamp: new Date().toISOString()
-        });
-        
-        // Handle specific password comparison errors
-        if (passwordError.code === 'NO_PASSWORD_HASH') {
-          return res.status(500).json({ message: 'Account configuration error' });
-        }
-        if (passwordError.code === 'NO_CANDIDATE_PASSWORD') {
-          return res.status(400).json({ message: 'Password is required' });
-        }
-        
-        return res.status(500).json({ 
-          message: 'Error during authentication',
-          details: process.env.NODE_ENV === 'development' ? passwordError.message : undefined
-        });
-      }
-
-      // Update status to online
-      user.status = 'online';
-      user.lastActive = new Date();
-      await user.save();
-
-      // Generate token
-      const token = jwt.sign(
-        { userId: user._id },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      console.log('Login successful:', {
+    } catch (passwordError) {
+      console.error('Password comparison error:', {
         userId: user._id,
         email: user.email,
-        mbtiType: user.mbtiType,
+        error: {
+          code: passwordError.code,
+          message: passwordError.message,
+          stack: passwordError.stack
+        },
         timestamp: new Date().toISOString()
       });
-
-      // Get profile sections with test breakdown
-      const TestResult = mongoose.model('TestResult');
-      let weightedResult = null;
-      let profileSections = [];
       
-      try {
-        weightedResult = await TestResult.calculateWeightedType(user._id);
-        console.log('Weighted result calculated:', {
-          userId: user._id,
-          hasResult: !!weightedResult,
-          type: weightedResult?.type,
-          testCount: weightedResult?.testBreakdown?.length,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error('Error calculating weighted result:', {
-          userId: user._id,
-          error: {
-            message: error.message,
-            stack: error.stack
-          },
-          timestamp: new Date().toISOString()
-        });
-        // Don't fail login if test results calculation fails
+      // Handle specific password comparison errors
+      if (passwordError.code === 'NO_PASSWORD_HASH') {
+        return res.status(500).json({ message: 'Account configuration error' });
       }
-
-      try {
-        profileSections = await user.getProfileSections(weightedResult);
-        console.log('Profile sections generated:', {
-          userId: user._id,
-          sectionCount: profileSections?.length,
-          firstSection: profileSections?.[0]?.title,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error('Error generating profile sections:', {
-          userId: user._id,
-          error: {
-            message: error.message,
-            stack: error.stack
-          },
-          timestamp: new Date().toISOString()
-        });
-        // Don't fail login if profile sections generation fails
-        profileSections = [];
+      if (passwordError.code === 'NO_CANDIDATE_PASSWORD') {
+        return res.status(400).json({ message: 'Password is required' });
       }
+      
+      // For other errors, send a generic error message
+      return res.status(500).json({ 
+        message: 'Error during authentication',
+        details: process.env.NODE_ENV === 'development' ? passwordError.message : undefined
+      });
+    }
 
-      // Prepare response
-      const response = {
-        token,
-        user: {
-          ...user.getPublicProfile(),
-          sections: profileSections || [],
-          profileSections: profileSections || [],
-          weightedResult: weightedResult || null
-        }
-      };
+    // Update status to online
+    user.status = 'online';
+    user.lastActive = new Date();
+    await user.save();
 
-      res.json(response);
+    // Generate token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log('Login successful:', {
+      userId: user._id,
+      email: user.email,
+      mbtiType: user.mbtiType,
+      timestamp: new Date().toISOString()
+    });
+
+    // Get profile sections with test breakdown
+    const TestResult = mongoose.model('TestResult');
+    let weightedResult = null;
+    let profileSections = [];
+    
+    try {
+      weightedResult = await TestResult.calculateWeightedType(user._id);
+      console.log('Weighted result calculated:', {
+        userId: user._id,
+        hasResult: !!weightedResult,
+        type: weightedResult?.type,
+        testCount: weightedResult?.testBreakdown?.length,
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
-      console.error('User lookup or authentication error:', {
-        email: email.toLowerCase(),
+      console.error('Error calculating weighted result:', {
+        userId: user._id,
         error: {
-          name: error.name,
           message: error.message,
           stack: error.stack
         },
         timestamp: new Date().toISOString()
       });
-      res.status(500).json({ 
-        message: 'Error during authentication',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
+      // Don't fail login if test results calculation fails
     }
+
+    try {
+      profileSections = await user.getProfileSections(weightedResult);
+      console.log('Profile sections generated:', {
+        userId: user._id,
+        sectionCount: profileSections?.length,
+        firstSection: profileSections?.[0]?.title,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error generating profile sections:', {
+        userId: user._id,
+        error: {
+          message: error.message,
+          stack: error.stack
+        },
+        timestamp: new Date().toISOString()
+      });
+      // Don't fail login if profile sections generation fails
+      profileSections = [];
+    }
+
+    // Prepare response
+    const response = {
+      token,
+      user: {
+        ...user.getPublicProfile(),
+        sections: profileSections || [],
+        profileSections: profileSections || [],
+        weightedResult: weightedResult || null
+      }
+    };
+
+    res.json(response);
   } catch (error) {
     console.error('Login error:', {
       message: error.message,

@@ -61,9 +61,9 @@ const testResultSchema = new mongoose.Schema({
 
 // Exact weight factors for different test types
 testResultSchema.statics.TEST_WEIGHTS = {
-  'mbti-100': 1.0,    // 100% weight for comprehensive test
-  'mbti-24': 0.24,    // 24% weight for medium test
-  'mbti-8': 0.08      // 8% weight for quick test
+  'mbti-100': 0.76,    // 76% weight (100 questions)
+  'mbti-24': 0.18,     // 18% weight (24 questions)
+  'mbti-8': 0.06       // 6% weight (8 questions)
 };
 
 // Calculate weighted personality type from multiple test results
@@ -101,13 +101,16 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     });
   });
 
+  // Normalize the total weight to 1.0
+  const normalizedWeight = 1.0 / weightedScores.totalWeight;
+
   // Calculate final normalized scores for each trait
   const normalizedScores = {};
   const traitPairs = [['E', 'I'], ['S', 'N'], ['T', 'F'], ['J', 'P']];
   
   traitPairs.forEach(([trait1, trait2]) => {
-    const score1 = weightedScores[trait1];
-    const score2 = weightedScores[trait2];
+    const score1 = weightedScores[trait1] * normalizedWeight;
+    const score2 = weightedScores[trait2] * normalizedWeight;
     const total = score1 + score2;
     
     if (total > 0) {
