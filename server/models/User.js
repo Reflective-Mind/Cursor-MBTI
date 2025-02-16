@@ -1,6 +1,31 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const contentSchema = new mongoose.Schema({
+  id: String,
+  title: String,
+  description: mongoose.Schema.Types.Mixed,
+  contentType: {
+    type: String,
+    enum: ['text', 'traits', 'breakdown']
+  }
+}, { _id: false });
+
+const profileSectionSchema = new mongoose.Schema({
+  id: String,
+  title: String,
+  type: {
+    type: String,
+    enum: ['default', 'personality', 'interests', 'languages', 'achievements', 'custom']
+  },
+  content: [contentSchema],
+  order: Number,
+  isVisible: {
+    type: Boolean,
+    default: true
+  }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -110,19 +135,7 @@ const userSchema = new mongoose.Schema({
       default: 'classic'
     }
   },
-  profileSections: [{
-    title: String,
-    content: String,
-    type: {
-      type: String,
-      enum: ['personality', 'interests', 'languages', 'achievements', 'custom']
-    },
-    order: Number,
-    isVisible: {
-      type: Boolean,
-      default: true
-    }
-  }],
+  profileSections: [profileSectionSchema],
   defaultSections: {
     personality: {
       isVisible: {
@@ -133,50 +146,6 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
       }
-    },
-    interests: {
-      isVisible: {
-        type: Boolean,
-        default: true
-      },
-      order: {
-        type: Number,
-        default: 1
-      }
-    },
-    languages: {
-      isVisible: {
-        type: Boolean,
-        default: true
-      },
-      order: {
-        type: Number,
-        default: 2
-      }
-    },
-    achievements: {
-      isVisible: {
-        type: Boolean,
-        default: true
-      },
-      order: {
-        type: Number,
-        default: 3
-      }
-    }
-  },
-  sectionLimits: {
-    maxMainSections: {
-      type: Number,
-      default: 10
-    },
-    maxSubSections: {
-      type: Number,
-      default: 15
-    },
-    maxContentLength: {
-      type: Number,
-      default: 2000
     }
   }
 }, {
@@ -198,7 +167,38 @@ userSchema.pre('save', async function(next) {
 
 // Method to compare passwords
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  try {
+    console.log('Comparing passwords for user:', {
+      id: this._id,
+      email: this.email,
+      hasPassword: !!this.password,
+      candidateLength: candidatePassword?.length
+    });
+    
+    if (!this.password) {
+      console.error('No password hash stored for user:', this._id);
+      return false;
+    }
+    
+    if (!candidatePassword) {
+      console.error('No candidate password provided for user:', this._id);
+      return false;
+    }
+    
+    const isMatch = await bcrypt.compare(candidatePassword, this.password);
+    console.log('Password comparison result:', {
+      userId: this._id,
+      isMatch: isMatch
+    });
+    
+    return isMatch;
+  } catch (error) {
+    console.error('Error comparing passwords:', {
+      userId: this._id,
+      error: error.message
+    });
+    return false;
+  }
 };
 
 // Method to get public profile
@@ -222,7 +222,8 @@ userSchema.methods.getPublicProfile = function() {
     theme: this.theme,
     roles: this.roles,
     joinedAt: this.joinedAt,
-    lastActive: this.lastActive
+    lastActive: this.lastActive,
+    profileSections: this.profileSections
   };
 };
 
@@ -236,35 +237,33 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
   }
 
   // Define default sections with proper structure
-  const defaultSections = {
-    personality: {
-      id: 'personality',
-      title: weightedResult ? weightedResult.profileTitle : 'Personality Profile',
-      type: 'default',
-      content: [
-        {
-          id: 'overview',
-          title: 'Personality Overview',
-          description: weightedResult ? generatePersonalityOverview(weightedResult) : 'Take a personality test to see your results',
-          contentType: 'text'
-        },
-        {
-          id: 'trait-strengths',
-          title: 'Trait Strengths',
-          description: weightedResult ? formatTraitStrengths(weightedResult) : null,
-          contentType: 'traits'
-        },
-        {
-          id: 'test-breakdown',
-          title: 'Test Results Breakdown',
-          description: weightedResult ? formatTestBreakdown(weightedResult) : null,
-          contentType: 'breakdown'
-        }
-      ],
-      order: this.defaultSections.personality.order,
-      isVisible: this.defaultSections.personality.isVisible
-    }
-  };
+  const defaultSections = [{
+    id: 'personality',
+    title: weightedResult ? weightedResult.profileTitle : 'Personality Profile',
+    type: 'personality',
+    content: [
+      {
+        id: 'overview',
+        title: 'Personality Overview',
+        description: weightedResult ? generatePersonalityOverview(weightedResult) : 'Take a personality test to see your results',
+        contentType: 'text'
+      },
+      {
+        id: 'trait-strengths',
+        title: 'Trait Strengths',
+        description: weightedResult ? formatTraitStrengths(weightedResult) : null,
+        contentType: 'traits'
+      },
+      {
+        id: 'test-breakdown',
+        title: 'Test Results Breakdown',
+        description: weightedResult ? formatTestBreakdown(weightedResult) : null,
+        contentType: 'breakdown'
+      }
+    ],
+    order: this.defaultSections.personality.order,
+    isVisible: this.defaultSections.personality.isVisible
+  }];
 
   return defaultSections;
 };

@@ -64,6 +64,13 @@ router.post('/', auth, async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
+    // Validate user exists
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      console.error('User not found:', req.user.userId);
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     // Map test type to category
     const testTypeMapping = {
       'mbti-8': 'mbti-8',
@@ -89,6 +96,21 @@ router.post('/', auth, async (req, res) => {
         body: req.body
       });
       return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Validate result structure
+    const { result } = req.body;
+    if (!result.type || !result.percentages || typeof result.percentages !== 'object') {
+      console.error('Invalid result structure:', { result });
+      return res.status(400).json({ message: 'Invalid result structure' });
+    }
+
+    // Validate percentages
+    const requiredTraits = ['E', 'I', 'S', 'N', 'T', 'F', 'J', 'P'];
+    const missingTraits = requiredTraits.filter(trait => typeof result.percentages[trait] !== 'number');
+    if (missingTraits.length > 0) {
+      console.error('Missing or invalid percentages:', { missingTraits });
+      return res.status(400).json({ message: 'Missing or invalid percentages' });
     }
 
     // Check if a result for this test category already exists
@@ -145,7 +167,6 @@ router.post('/', auth, async (req, res) => {
       });
 
       // Update user's MBTI type with weighted result
-      const user = await User.findById(req.user.userId);
       user.mbtiType = weightedResult.type;
       user.personalityTraits = [
         { trait: 'Extroversion-Introversion', strength: weightedResult.percentages.E },
@@ -156,7 +177,7 @@ router.post('/', auth, async (req, res) => {
       
       // Generate and store profile sections with weighted result
       const profileSections = await user.getProfileSections(weightedResult);
-      user.profileSections = profileSections;
+      user.profileSections = Array.isArray(profileSections) ? profileSections : Object.values(profileSections);
       await user.save();
 
       // Add weighted calculation and profile sections to the response
@@ -164,15 +185,15 @@ router.post('/', auth, async (req, res) => {
         ...savedResult.toObject(),
         weightedResult,
         sections: profileSections,
-        profileSections,
+        profileSections: Array.isArray(profileSections) ? profileSections : Object.values(profileSections),
         testBreakdown: weightedResult.testBreakdown
       };
 
       console.log('Updated user profile with sections:', {
         userId: user._id,
         mbtiType: user.mbtiType,
-        sectionCount: profileSections.length,
-        sections: profileSections.map(s => ({
+        sectionCount: Array.isArray(profileSections) ? profileSections.length : Object.keys(profileSections).length,
+        sections: (Array.isArray(profileSections) ? profileSections : Object.values(profileSections)).map(s => ({
           id: s.id,
           title: s.title,
           contentCount: s.content?.length

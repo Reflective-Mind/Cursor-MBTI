@@ -7,6 +7,7 @@ const auth = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
@@ -155,18 +156,34 @@ router.post('/login', async (req, res) => {
 
     // Validate input
     if (!email || !password) {
+      console.log('Missing email or password');
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
     // Find user - convert email to lowercase for case-insensitive comparison
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
+      console.log('User not found:', email.toLowerCase());
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    console.log('Found user:', {
+      id: user._id,
+      email: user.email,
+      hasPassword: !!user.password,
+      mbtiType: user.mbtiType,
+      status: user.status
+    });
+
     // Check password
     const isMatch = await user.comparePassword(password);
+    console.log('Password check result:', {
+      userId: user._id,
+      isMatch: isMatch
+    });
+
     if (!isMatch) {
+      console.log('Invalid password for user:', email.toLowerCase());
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -184,20 +201,72 @@ router.post('/login', async (req, res) => {
 
     console.log('Login successful:', {
       userId: user._id,
-      email: user.email
+      email: user.email,
+      mbtiType: user.mbtiType
     });
 
-    res.json({
+    // Get profile sections with test breakdown
+    const TestResult = mongoose.model('TestResult');
+    let weightedResult = null;
+    let profileSections = [];
+    
+    try {
+      weightedResult = await TestResult.calculateWeightedType(user._id);
+      console.log('Weighted result calculated:', {
+        userId: user._id,
+        hasResult: !!weightedResult,
+        type: weightedResult?.type,
+        testCount: weightedResult?.testBreakdown?.length
+      });
+    } catch (error) {
+      console.error('Error calculating weighted result:', {
+        userId: user._id,
+        error: error.message
+      });
+      // Don't fail login if test results calculation fails
+    }
+
+    try {
+      profileSections = await user.getProfileSections(weightedResult);
+      console.log('Profile sections generated:', {
+        userId: user._id,
+        sectionCount: profileSections?.length,
+        firstSection: profileSections?.[0]?.title
+      });
+    } catch (error) {
+      console.error('Error generating profile sections:', {
+        userId: user._id,
+        error: error.message
+      });
+      // Don't fail login if profile sections generation fails
+      profileSections = [];
+    }
+
+    // Prepare response
+    const response = {
       token,
-      user: user.getPublicProfile()
-    });
+      user: {
+        ...user.getPublicProfile(),
+        sections: profileSections || [],
+        profileSections: profileSections || [],
+        weightedResult: weightedResult || null
+      }
+    };
+
+    res.json(response);
   } catch (error) {
     console.error('Login error:', {
       message: error.message,
       stack: error.stack,
-      body: req.body
+      body: {
+        ...req.body,
+        password: '[REDACTED]'
+      }
     });
-    res.status(500).json({ message: 'Error logging in', details: error.message });
+    res.status(500).json({ 
+      message: 'Error logging in', 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 
