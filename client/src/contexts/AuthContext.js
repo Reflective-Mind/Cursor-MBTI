@@ -62,13 +62,18 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
 
+      console.log('Attempting registration with:', {
+        url: `${process.env.REACT_APP_API_URL}/api/auth/register`,
+        username,
+        email,
+        mbtiType
+      });
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({
           username,
           email,
@@ -80,11 +85,17 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to register');
+        const errorMessage = data.message || 'Failed to register';
+        console.error('Registration failed:', {
+          status: response.status,
+          message: errorMessage
+        });
+        throw new Error(errorMessage);
       }
 
       if (!data.token) {
-        throw new Error('No token received from server');
+        console.error('No token received from server');
+        throw new Error('Registration failed - no token received');
       }
 
       localStorage.setItem('token', data.token);
@@ -92,6 +103,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('mbtiType', data.user.mbtiType);
       }
       setUser(data.user);
+
+      console.log('Registration successful');
       return data.user;
     } catch (error) {
       console.error('Registration error:', error);
@@ -107,11 +120,15 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
 
+      console.log('Attempting login with:', {
+        url: `${process.env.REACT_APP_API_URL}/api/auth/login`,
+        email
+      });
+
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ email, password })
       });
@@ -120,7 +137,10 @@ export const AuthProvider = ({ children }) => {
 
       if (!response.ok) {
         const errorMessage = data.message || 'Failed to login';
-        console.error('Login failed:', errorMessage);
+        console.error('Login failed:', {
+          status: response.status,
+          message: errorMessage
+        });
         throw new Error(errorMessage);
       }
 

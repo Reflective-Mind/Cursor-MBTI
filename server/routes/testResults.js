@@ -9,12 +9,15 @@ console.log('Initializing testResults router');
 // Initialize AI clients if API keys are available
 let mistral;
 let openai;
+let MistralClient;
 
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { MistralClient } = require('@mistralai/mistralai');
-    mistral = new MistralClient(process.env.MISTRAL_API_KEY);
-    console.log('Test Results Router: Mistral AI client initialized successfully');
+    (async () => {
+      const { default: { MistralClient: Client } } = await import('@mistralai/mistralai');
+      mistral = new Client(process.env.MISTRAL_API_KEY);
+      console.log('Test Results Router: Mistral AI client initialized successfully');
+    })().catch(console.error);
   }
 } catch (error) {
   console.warn('Test Results Router: Failed to initialize Mistral AI client:', error.message);

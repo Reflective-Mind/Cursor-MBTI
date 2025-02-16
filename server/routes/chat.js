@@ -5,12 +5,18 @@ const TestResult = require('../models/TestResult');
 
 console.log('Initializing chat router');
 
+// Replace require with dynamic import
+let MistralClient;
+(async () => {
+  const { default: { MistralClient: Client } } = await import('@mistralai/mistralai');
+  MistralClient = Client;
+})().catch(console.error);
+
 // Initialize Mistral client if API key is available
 let mistral;
 try {
   if (process.env.MISTRAL_API_KEY) {
-    const { Mistral } = require('@mistralai/mistralai');
-    mistral = new Mistral(process.env.MISTRAL_API_KEY);
+    mistral = new MistralClient(process.env.MISTRAL_API_KEY);
     console.log('Chat Router: Mistral AI client initialized successfully');
   } else {
     console.warn('Chat Router: MISTRAL_API_KEY is not set in environment variables');

@@ -72,43 +72,34 @@ app.use(express.urlencoded({ extended: true }));
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      'https://cursor-mbti.vercel.app',
-      'http://localhost:3000',
-      'https://mbti-render.onrender.com',
-      'https://cursor-mbti-git-master-reflective-mind.vercel.app',
-      'https://cursor-mbti.vercel.app',
-      'https://cursor-mbti-reflective-mind.vercel.app',
-      undefined
-    ];
-
-    // Allow all origins in development
-    if (process.env.NODE_ENV === 'development') {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) {
       callback(null, true);
       return;
     }
 
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'https://cursor-mbti.vercel.app',
+      'https://mbti-render.onrender.com'
+    ];
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('Origin not allowed:', origin, {
-        allowedOrigins,
-        timestamp: new Date().toISOString()
-      });
-      // Instead of throwing an error, we'll allow the request but log it
-      callback(null, true);
+      console.log('Origin not allowed:', origin);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  maxAge: 86400
+  exposedHeaders: ['Content-Length', 'Content-Type']
 };
 
-// Apply CORS middleware first
+// Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Add middleware to handle preflight requests
@@ -117,10 +108,12 @@ app.options('*', cors(corsOptions));
 // Add middleware to set CORS headers for all responses
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+  }
   next();
 });
 
