@@ -297,35 +297,55 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
   const defaultSections = [];
   
   if (weightedResult) {
-    // Format trait analysis to show growth areas and interaction styles
+    // Create interaction patterns and growth areas analysis
     const traitAnalysis = [
       {
-        trait1: { letter: 'E', score: weightedResult.percentages.E, 
-                 focus: 'External World', style: 'Social Energy' },
-        trait2: { letter: 'I', score: weightedResult.percentages.I,
-                 focus: 'Inner World', style: 'Personal Energy' },
-        strength: Math.abs(weightedResult.percentages.E - weightedResult.percentages.I)
+        title: 'Communication Style',
+        trait1: { letter: 'E', score: weightedResult.percentages.E },
+        trait2: { letter: 'I', score: weightedResult.percentages.I },
+        strength: Math.abs(weightedResult.percentages.E - weightedResult.percentages.I),
+        pattern: weightedResult.percentages.E > weightedResult.percentages.I 
+          ? 'Thrives in group discussions and collaborative environments'
+          : 'Excels in one-on-one interactions and written communication',
+        growth: weightedResult.percentages.E > weightedResult.percentages.I
+          ? 'Develop active listening and reflection skills'
+          : 'Practice initiating conversations and sharing thoughts more readily'
       },
       {
-        trait1: { letter: 'S', score: weightedResult.percentages.S,
-                 focus: 'Concrete Details', style: 'Learning Style' },
-        trait2: { letter: 'N', score: weightedResult.percentages.N,
-                 focus: 'Abstract Patterns', style: 'Learning Style' },
-        strength: Math.abs(weightedResult.percentages.S - weightedResult.percentages.N)
+        title: 'Information Processing',
+        trait1: { letter: 'S', score: weightedResult.percentages.S },
+        trait2: { letter: 'N', score: weightedResult.percentages.N },
+        strength: Math.abs(weightedResult.percentages.S - weightedResult.percentages.N),
+        pattern: weightedResult.percentages.S > weightedResult.percentages.N
+          ? 'Excels at implementing practical solutions and handling details'
+          : 'Strong at identifying patterns and generating innovative ideas',
+        growth: weightedResult.percentages.S > weightedResult.percentages.N
+          ? 'Explore abstract concepts and long-term implications'
+          : 'Focus on practical implementation and immediate realities'
       },
       {
-        trait1: { letter: 'T', score: weightedResult.percentages.T,
-                 focus: 'Logic & Analysis', style: 'Decision Making' },
-        trait2: { letter: 'F', score: weightedResult.percentages.F,
-                 focus: 'Values & Impact', style: 'Decision Making' },
-        strength: Math.abs(weightedResult.percentages.T - weightedResult.percentages.F)
+        title: 'Decision Making',
+        trait1: { letter: 'T', score: weightedResult.percentages.T },
+        trait2: { letter: 'F', score: weightedResult.percentages.F },
+        strength: Math.abs(weightedResult.percentages.T - weightedResult.percentages.F),
+        pattern: weightedResult.percentages.T > weightedResult.percentages.F
+          ? 'Makes decisions based on objective analysis and logical consequences'
+          : 'Considers impact on people and maintains group harmony',
+        growth: weightedResult.percentages.T > weightedResult.percentages.F
+          ? 'Develop emotional intelligence and consider personal impact'
+          : 'Practice objective analysis and maintain healthy boundaries'
       },
       {
-        trait1: { letter: 'J', score: weightedResult.percentages.J,
-                 focus: 'Structure & Planning', style: 'Work Style' },
-        trait2: { letter: 'P', score: weightedResult.percentages.P,
-                 focus: 'Flexibility & Adaptation', style: 'Work Style' },
-        strength: Math.abs(weightedResult.percentages.J - weightedResult.percentages.P)
+        title: 'Work & Planning',
+        trait1: { letter: 'J', score: weightedResult.percentages.J },
+        trait2: { letter: 'P', score: weightedResult.percentages.P },
+        strength: Math.abs(weightedResult.percentages.J - weightedResult.percentages.P),
+        pattern: weightedResult.percentages.J > weightedResult.percentages.P
+          ? 'Creates structured plans and follows through systematically'
+          : 'Adapts quickly and keeps options open for new opportunities',
+        growth: weightedResult.percentages.J > weightedResult.percentages.P
+          ? 'Practice flexibility and openness to spontaneous opportunities'
+          : 'Develop consistent routines and improve follow-through'
       }
     ];
 
@@ -342,7 +362,7 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
         },
         {
           id: 'trait-strengths',
-          title: 'Interaction & Growth Analysis',
+          title: 'Interaction Patterns & Growth Areas',
           description: traitAnalysis,
           contentType: 'traits'
         },
@@ -466,6 +486,17 @@ userSchema.methods.generateAIStory = async function() {
       )
     };
 
+    // Helper function to clean question text
+    const cleanQuestionText = (text) => {
+      if (!text) return '';
+      return text.toLowerCase()
+        .replace(/^(in|when|how|what) (do you|would you|are you|is your|you)/, '')
+        .replace(/\?/g, '')
+        .replace(/your/g, 'their')
+        .replace(/you/g, 'they')
+        .trim();
+    };
+
     let story = '';
     const insights = [];
 
@@ -474,55 +505,65 @@ userSchema.methods.generateAIStory = async function() {
       const socialStyle = themes.social.filter(a => a.answer === 'E').length > themes.social.length / 2 
         ? 'naturally outgoing and socially engaged' 
         : 'thoughtful and selective in social interactions';
-      insights.push(`In social settings, this individual is ${socialStyle}. They tend to ${
-        themes.social.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
-          .replace('your', 'their')
-          .replace('?', '')).join(' and ')
-      }.`);
+      const behaviors = themes.social.slice(0, 2)
+        .map(a => cleanQuestionText(a.question))
+        .filter(text => text.length > 0);
+      
+      if (behaviors.length > 0) {
+        insights.push(`In social settings, this individual is ${socialStyle}. They ${behaviors.join(' and ')}.`);
+      }
     }
 
     if (themes.work.length > 0) {
       const workStyle = themes.work.filter(a => a.answer === 'J').length > themes.work.length / 2
         ? 'structured and methodical'
         : 'flexible and adaptable';
-      insights.push(`Their approach to work is ${workStyle}, particularly when ${
-        themes.work.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
-          .replace('your', 'their')
-          .replace('?', '')).join(' and when ')
-      }.`);
+      const behaviors = themes.work.slice(0, 2)
+        .map(a => cleanQuestionText(a.question))
+        .filter(text => text.length > 0);
+      
+      if (behaviors.length > 0) {
+        insights.push(`Their approach to work is ${workStyle}. They ${behaviors.join(' and ')}.`);
+      }
     }
 
     if (themes.learning.length > 0) {
       const learningStyle = themes.learning.filter(a => a.answer === 'N').length > themes.learning.length / 2
         ? 'focus on patterns and possibilities'
         : 'prefer concrete facts and practical applications';
-      insights.push(`When learning or problem-solving, they ${learningStyle}. This is evident in how ${
-        themes.learning.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
-          .replace('your', 'their')
-          .replace('?', '')).join(' and how ')
-      }.`);
+      const behaviors = themes.learning.slice(0, 2)
+        .map(a => cleanQuestionText(a.question))
+        .filter(text => text.length > 0);
+      
+      if (behaviors.length > 0) {
+        insights.push(`When learning or problem-solving, they ${learningStyle}. This is evident in how they ${behaviors.join(' and ')}.`);
+      }
     }
 
     if (themes.values.length > 0) {
       const decisionStyle = themes.values.filter(a => a.answer === 'F').length > themes.values.length / 2
         ? 'prioritize personal values and emotional impact'
         : 'focus on logical analysis and objective criteria';
-      insights.push(`In decision-making, they ${decisionStyle}. This is reflected in how ${
-        themes.values.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
-          .replace('your', 'their')
-          .replace('?', '')).join(' and how ')
-      }.`);
+      const behaviors = themes.values.slice(0, 2)
+        .map(a => cleanQuestionText(a.question))
+        .filter(text => text.length > 0);
+      
+      if (behaviors.length > 0) {
+        insights.push(`In decision-making, they ${decisionStyle}. This is reflected in how they ${behaviors.join(' and ')}.`);
+      }
     }
 
     if (themes.energy.length > 0) {
       const energyStyle = themes.energy.filter(a => a.answer === 'E').length > themes.energy.length / 2
         ? 'gain energy through social interaction and external engagement'
         : 'recharge through solitude and internal reflection';
-      insights.push(`They typically ${energyStyle}. This is demonstrated by how ${
-        themes.energy.slice(0, 2).map(a => a.question?.toLowerCase().replace('you', 'they')
-          .replace('your', 'their')
-          .replace('?', '')).join(' and how ')
-      }.`);
+      const behaviors = themes.energy.slice(0, 2)
+        .map(a => cleanQuestionText(a.question))
+        .filter(text => text.length > 0);
+      
+      if (behaviors.length > 0) {
+        insights.push(`They typically ${energyStyle}. This is demonstrated by how they ${behaviors.join(' and ')}.`);
+      }
     }
 
     // Combine insights into a cohesive narrative
@@ -537,10 +578,12 @@ userSchema.methods.generateAIStory = async function() {
 
     if (uniqueAnswers.length > 0) {
       const uniqueTraits = uniqueAnswers.slice(0, 3)
-        .map(a => a.question?.toLowerCase().replace('you', 'they')
-          .replace('your', 'their'));
+        .map(a => cleanQuestionText(a.question))
+        .filter(text => text.length > 0);
       
-      story += `\n\nDistinctive characteristics include ${uniqueTraits.join(', ')}.`;
+      if (uniqueTraits.length > 0) {
+        story += `\n\nDistinctive characteristics include how they ${uniqueTraits.join(', ')}.`;
+      }
     }
 
     // Add summary based on test history if multiple tests exist
