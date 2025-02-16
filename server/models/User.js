@@ -248,7 +248,7 @@ userSchema.methods.getProfileSections = async function() {
     personality: {
       id: 'personality',
       title: weightedResult ? 
-        weightedResult.profileTitle :
+        `MBTI Type: ${weightedResult.type} - ${weightedResult.profileTitle.split(' - ')[1]}` :
         `${this.mbtiType || 'Unknown'} - Take the MBTI Test`,
       type: 'default',
       content: [
@@ -356,7 +356,18 @@ function getPersonalityTitle(mbtiType) {
 // Helper function to generate personality overview
 function generatePersonalityOverview(weightedResult) {
   if (weightedResult.isBalanced) {
-    return `Your test results show balanced preferences in some areas. This means you may exhibit flexibility in your approach to different situations. To get a more definitive type assessment, consider taking the comprehensive MBTI-100 test.`;
+    const traits = [
+      { name: 'Extroversion-Introversion', trait: weightedResult.dominantTraits.attitude, strength: weightedResult.traitStrengths.EI },
+      { name: 'Sensing-Intuition', trait: weightedResult.dominantTraits.perception, strength: weightedResult.traitStrengths.SN },
+      { name: 'Thinking-Feeling', trait: weightedResult.dominantTraits.judgment, strength: weightedResult.traitStrengths.TF },
+      { name: 'Judging-Perceiving', trait: weightedResult.dominantTraits.lifestyle, strength: weightedResult.traitStrengths.JP }
+    ];
+
+    const balancedTraits = traits
+      .filter(t => t.strength <= 15)
+      .map(t => t.name);
+
+    return `Your test results show balanced preferences in ${balancedTraits.join(', ')}. To get a more definitive type assessment, consider taking the comprehensive MBTI-100 test which provides the most accurate results.`;
   }
 
   const traits = [
@@ -370,7 +381,7 @@ function generatePersonalityOverview(weightedResult) {
     .sort((a, b) => b.strength - a.strength)
     .slice(0, 2);
 
-  return `Based on your weighted test results, you show a clear preference for ${weightedResult.type}. Your strongest traits are ${strongestTraits[0].trait} (${strongestTraits[0].strength}% preference) and ${strongestTraits[1].trait} (${strongestTraits[1].strength}% preference). This combination creates a unique perspective that influences how you interact with the world, make decisions, and process information.`;
+  return `Based on your weighted test results, you show a ${weightedResult.type} personality type. Your strongest traits are ${strongestTraits[0].trait} (${strongestTraits[0].strength}% preference) and ${strongestTraits[1].trait} (${strongestTraits[1].strength}% preference). This combination creates a unique perspective that influences how you interact with the world, make decisions, and process information.`;
 }
 
 // Helper function to format trait strengths

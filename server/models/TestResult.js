@@ -131,17 +131,17 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
   };
 
   // Adjust minimum strength threshold based on test weights
-  const MINIMUM_STRENGTH_THRESHOLD = Math.min(
-    10,  // Base threshold
-    weightedScores.totalWeight * 5  // Weighted threshold
+  const MINIMUM_STRENGTH_THRESHOLD = Math.max(
+    15,  // Increased base threshold
+    weightedScores.totalWeight * 10  // Increased weighted threshold
   );
 
   // Determine final type based on normalized scores and adjusted threshold
   const finalType = [
-    traitStrengths.EI > MINIMUM_STRENGTH_THRESHOLD ? (normalizedScores.E > normalizedScores.I ? 'E' : 'I') : 'X',
-    traitStrengths.SN > MINIMUM_STRENGTH_THRESHOLD ? (normalizedScores.S > normalizedScores.N ? 'S' : 'N') : 'X',
-    traitStrengths.TF > MINIMUM_STRENGTH_THRESHOLD ? (normalizedScores.T > normalizedScores.F ? 'T' : 'F') : 'X',
-    traitStrengths.JP > MINIMUM_STRENGTH_THRESHOLD ? (normalizedScores.J > normalizedScores.P ? 'J' : 'P') : 'X'
+    normalizedScores.E > normalizedScores.I ? 'E' : 'I',
+    normalizedScores.S > normalizedScores.N ? 'S' : 'N',
+    normalizedScores.T > normalizedScores.F ? 'T' : 'F',
+    normalizedScores.J > normalizedScores.P ? 'J' : 'P'
   ].join('');
 
   // Calculate test contributions with adjusted weights
@@ -152,6 +152,29 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     date: r.createdAt,
     percentages: r.result.percentages
   })).sort((a, b) => b.weight - a.weight);
+
+  // Get personality title
+  const getPersonalityTitle = (type) => {
+    const titles = {
+      'INTJ': 'Architect - Strategic & Analytical Mastermind',
+      'INTP': 'Logician - Innovative Problem Solver',
+      'ENTJ': 'Commander - Dynamic & Strategic Leader',
+      'ENTP': 'Debater - Innovative & Versatile Thinker',
+      'INFJ': 'Counselor - Insightful & Empathetic Guide',
+      'INFP': 'Mediator - Creative & Authentic Idealist',
+      'ENFJ': 'Teacher - Charismatic & Inspiring Leader',
+      'ENFP': 'Champion - Enthusiastic & Creative Catalyst',
+      'ISTJ': 'Inspector - Reliable & Systematic Organizer',
+      'ISFJ': 'Protector - Dedicated & Nurturing Guardian',
+      'ESTJ': 'Supervisor - Efficient & Practical Manager',
+      'ESFJ': 'Provider - Supportive & Social Harmonizer',
+      'ISTP': 'Craftsperson - Skilled & Adaptable Problem-Solver',
+      'ISFP': 'Composer - Artistic & Compassionate Creator',
+      'ESTP': 'Dynamo - Energetic & Practical Doer',
+      'ESFP': 'Performer - Spontaneous & Engaging Entertainer'
+    };
+    return titles[type] || 'Personality Type';
+  };
 
   return {
     type: finalType,
