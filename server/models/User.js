@@ -298,36 +298,28 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
   
   if (weightedResult) {
     // Format trait strengths for better display
-    const traitAnalysis = {
-      EI: {
-        dominant: weightedResult.percentages.E > weightedResult.percentages.I ? 'Extroversion' : 'Introversion',
-        strength: Math.abs(weightedResult.percentages.E - weightedResult.percentages.I),
-        description: weightedResult.percentages.E > weightedResult.percentages.I ?
-          `Prefers social interaction and external engagement (${weightedResult.percentages.E}% E)` :
-          `Values internal reflection and personal space (${weightedResult.percentages.I}% I)`
+    const traitAnalysis = [
+      {
+        trait1: { letter: 'E', score: weightedResult.percentages.E },
+        trait2: { letter: 'I', score: weightedResult.percentages.I },
+        strength: Math.abs(weightedResult.percentages.E - weightedResult.percentages.I)
       },
-      SN: {
-        dominant: weightedResult.percentages.S > weightedResult.percentages.N ? 'Sensing' : 'Intuition',
-        strength: Math.abs(weightedResult.percentages.S - weightedResult.percentages.N),
-        description: weightedResult.percentages.S > weightedResult.percentages.N ?
-          `Focuses on concrete facts and practical details (${weightedResult.percentages.S}% S)` :
-          `Sees patterns and explores possibilities (${weightedResult.percentages.N}% N)`
+      {
+        trait1: { letter: 'S', score: weightedResult.percentages.S },
+        trait2: { letter: 'N', score: weightedResult.percentages.N },
+        strength: Math.abs(weightedResult.percentages.S - weightedResult.percentages.N)
       },
-      TF: {
-        dominant: weightedResult.percentages.T > weightedResult.percentages.F ? 'Thinking' : 'Feeling',
-        strength: Math.abs(weightedResult.percentages.T - weightedResult.percentages.F),
-        description: weightedResult.percentages.T > weightedResult.percentages.F ?
-          `Makes decisions through logical analysis (${weightedResult.percentages.T}% T)` :
-          `Considers human impact in decisions (${weightedResult.percentages.F}% F)`
+      {
+        trait1: { letter: 'T', score: weightedResult.percentages.T },
+        trait2: { letter: 'F', score: weightedResult.percentages.F },
+        strength: Math.abs(weightedResult.percentages.T - weightedResult.percentages.F)
       },
-      JP: {
-        dominant: weightedResult.percentages.J > weightedResult.percentages.P ? 'Judging' : 'Perceiving',
-        strength: Math.abs(weightedResult.percentages.J - weightedResult.percentages.P),
-        description: weightedResult.percentages.J > weightedResult.percentages.P ?
-          `Prefers structure and planning (${weightedResult.percentages.J}% J)` :
-          `Values flexibility and adaptability (${weightedResult.percentages.P}% P)`
+      {
+        trait1: { letter: 'J', score: weightedResult.percentages.J },
+        trait2: { letter: 'P', score: weightedResult.percentages.P },
+        strength: Math.abs(weightedResult.percentages.J - weightedResult.percentages.P)
       }
-    };
+    ];
 
     defaultSections.push({
       id: 'personality',
@@ -427,111 +419,115 @@ userSchema.methods.generateAIStory = async function() {
       throw new Error('No test results available');
     }
 
-    const weightedResult = await TestResult.calculateWeightedType(this._id);
-    if (!weightedResult) {
-      throw new Error('Could not calculate weighted personality type');
+    const allAnswers = results.flatMap(result => result.answers || []);
+    if (allAnswers.length === 0) {
+      throw new Error('No answers found in test results');
     }
 
-    const { type, percentages } = weightedResult;
-    const allAnswers = results.flatMap(result => result.answers || []);
-    
-    const answersByCategory = {
-      EI: allAnswers.filter(a => a.category === 'EI'),
-      SN: allAnswers.filter(a => a.category === 'SN'),
-      TF: allAnswers.filter(a => a.category === 'TF'),
-      JP: allAnswers.filter(a => a.category === 'JP')
+    // Group answers by their implications rather than by category
+    const personalityInsights = {
+      socialStyle: allAnswers.filter(a => 
+        a.question?.toLowerCase().includes('social') || 
+        a.question?.toLowerCase().includes('group') ||
+        a.question?.toLowerCase().includes('people')
+      ),
+      thinkingStyle: allAnswers.filter(a => 
+        a.question?.toLowerCase().includes('decision') || 
+        a.question?.toLowerCase().includes('problem') ||
+        a.question?.toLowerCase().includes('think')
+      ),
+      workStyle: allAnswers.filter(a => 
+        a.question?.toLowerCase().includes('work') || 
+        a.question?.toLowerCase().includes('organize') ||
+        a.question?.toLowerCase().includes('plan')
+      ),
+      energyStyle: allAnswers.filter(a => 
+        a.question?.toLowerCase().includes('energy') || 
+        a.question?.toLowerCase().includes('recharge') ||
+        a.question?.toLowerCase().includes('prefer')
+      )
     };
 
-    let story = `This individual has a distinct ${type} personality profile. `;
+    let story = '';
 
-    // Core personality analysis
-    const traits = [];
+    // Build a narrative based on actual answers
+    const insights = [];
 
-    // E/I Analysis
-    if (percentages.E > percentages.I) {
-      const socialAnswers = answersByCategory.EI.filter(a => a.answer === 'E');
-      traits.push(`They are energized by social interaction (${percentages.E}% Extroverted), particularly ${
-        socialAnswers.length > 0 ? 
-        'showing enthusiasm for ' + socialAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'in collaborative and group settings'
-      }`);
-    } else {
-      const introvertAnswers = answersByCategory.EI.filter(a => a.answer === 'I');
-      traits.push(`They find strength in introspection (${percentages.I}% Introverted), particularly ${
-        introvertAnswers.length > 0 ?
-        'valuing ' + introvertAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'appreciating time for internal processing'
+    // Social Interaction Style
+    if (personalityInsights.socialStyle.length > 0) {
+      const socialPreference = personalityInsights.socialStyle.map(a => ({
+        text: a.question?.toLowerCase(),
+        isExtroverted: a.answer === 'E'
+      }));
+      
+      const extrovertedCount = socialPreference.filter(p => p.isExtroverted).length;
+      const socialStyle = extrovertedCount > socialPreference.length / 2 ? 'outgoing' : 'reserved';
+      
+      insights.push(`When it comes to social situations, this person is naturally ${socialStyle}, as shown by their ${
+        socialPreference.map(p => `approach to ${p.text}`).join(' and ')
       }`);
     }
 
-    // S/N Analysis
-    if (percentages.S > percentages.N) {
-      const sensingAnswers = answersByCategory.SN.filter(a => a.answer === 'S');
-      traits.push(`Their practical mindset (${percentages.S}% Sensing) is evident in ${
-        sensingAnswers.length > 0 ?
-        'their approach to ' + sensingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'their focus on concrete facts and real-world applications'
-      }`);
-    } else {
-      const intuitionAnswers = answersByCategory.SN.filter(a => a.answer === 'N');
-      traits.push(`Their intuitive nature (${percentages.N}% Intuitive) shines through in ${
-        intuitionAnswers.length > 0 ?
-        'their way of ' + intuitionAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'their ability to see patterns and future possibilities'
+    // Thinking and Decision-Making Style
+    if (personalityInsights.thinkingStyle.length > 0) {
+      const decisions = personalityInsights.thinkingStyle.map(a => ({
+        text: a.question?.toLowerCase(),
+        isLogical: a.answer === 'T'
+      }));
+      
+      const logicalCount = decisions.filter(d => d.isLogical).length;
+      const decisionStyle = logicalCount > decisions.length / 2 ? 'analytical' : 'empathetic';
+      
+      insights.push(`Their decision-making style is predominantly ${decisionStyle}, particularly when ${
+        decisions.map(d => d.text).join(' and when ')
       }`);
     }
 
-    // T/F Analysis
-    if (percentages.T > percentages.F) {
-      const thinkingAnswers = answersByCategory.TF.filter(a => a.answer === 'T');
-      traits.push(`In decision-making (${percentages.T}% Thinking), they excel at ${
-        thinkingAnswers.length > 0 ?
-        'applying logic to ' + thinkingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'analyzing situations objectively and systematically'
-      }`);
-    } else {
-      const feelingAnswers = answersByCategory.TF.filter(a => a.answer === 'F');
-      traits.push(`Their decision-making process (${percentages.F}% Feeling) is characterized by ${
-        feelingAnswers.length > 0 ?
-        'strong consideration of ' + feelingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'deep awareness of human values and emotional impact'
+    // Work and Organization Style
+    if (personalityInsights.workStyle.length > 0) {
+      const workApproach = personalityInsights.workStyle.map(a => ({
+        text: a.question?.toLowerCase(),
+        isStructured: a.answer === 'J'
+      }));
+      
+      const structuredCount = workApproach.filter(w => w.isStructured).length;
+      const workStyle = structuredCount > workApproach.length / 2 ? 'methodical' : 'flexible';
+      
+      insights.push(`At work or in projects, they take a ${workStyle} approach, especially when ${
+        workApproach.map(w => w.text).join(' and when ')
       }`);
     }
 
-    // J/P Analysis
-    if (percentages.J > percentages.P) {
-      const judgingAnswers = answersByCategory.JP.filter(a => a.answer === 'J');
-      traits.push(`Their structured approach to life (${percentages.J}% Judging) is demonstrated through ${
-        judgingAnswers.length > 0 ?
-        'their preference for ' + judgingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'their systematic and organized way of handling tasks'
+    // Energy and Recharging Style
+    if (personalityInsights.energyStyle.length > 0) {
+      const energyPatterns = personalityInsights.energyStyle.map(a => ({
+        text: a.question?.toLowerCase(),
+        isExternal: a.answer === 'E'
+      }));
+      
+      const externalCount = energyPatterns.filter(e => e.isExternal).length;
+      const energyStyle = externalCount > energyPatterns.length / 2 ? 
+        'draws energy from social interaction' : 
+        'recharges through personal space';
+      
+      insights.push(`This individual ${energyStyle}, which is evident in how they ${
+        energyPatterns.map(e => e.text).join(' and how they ')
       }`);
-    } else {
-      const perceivingAnswers = answersByCategory.JP.filter(a => a.answer === 'P');
-      traits.push(`Their adaptable nature (${percentages.P}% Perceiving) is reflected in ${
-        perceivingAnswers.length > 0 ?
-        'their enjoyment of ' + perceivingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
-        'their flexible and spontaneous approach to life'
-      }`);
     }
 
-    // Combine traits into a flowing narrative
-    story += traits.join('. ') + '.';
+    // Combine insights into a cohesive narrative
+    story = insights.join('. ') + '.';
 
-    // Add unique combinations insight if present
-    const uniqueCombinations = [];
-    if (percentages.E > percentages.I && percentages.F > percentages.T) {
-      uniqueCombinations.push("Their combination of extroversion and emotional awareness makes them particularly skilled at building and maintaining meaningful relationships");
-    }
-    if (percentages.S > percentages.N && percentages.J > percentages.P) {
-      uniqueCombinations.push("Their practical mindset combined with organizational skills enables them to effectively turn plans into reality");
-    }
-    if (percentages.N > percentages.S && percentages.F > percentages.T) {
-      uniqueCombinations.push("Their intuitive understanding of patterns combined with emotional intelligence gives them unique insight into human dynamics");
-    }
+    // Add specific behavioral examples if available
+    const uniqueBehaviors = allAnswers
+      .filter(a => a.question && !Object.values(personalityInsights).flat().includes(a))
+      .map(a => a.question?.toLowerCase())
+      .filter(q => q);
 
-    if (uniqueCombinations.length > 0) {
-      story += "\n\nNotable characteristics: " + uniqueCombinations.join(". ") + ".";
+    if (uniqueBehaviors.length > 0) {
+      story += `\n\nSpecific traits that stand out include their approach to ${
+        uniqueBehaviors.slice(0, 3).join(', ')
+      }.`;
     }
 
     return story;
