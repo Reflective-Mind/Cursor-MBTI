@@ -168,50 +168,73 @@ userSchema.pre('save', async function(next) {
 // Method to compare passwords
 userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
-    console.log('Comparing passwords for user:', {
+    // Log initial state
+    console.log('Starting password comparison for user:', {
       id: this._id,
       email: this.email,
       hasPassword: !!this.password,
       candidateLength: candidatePassword?.length,
-      passwordLength: this.password?.length
+      passwordLength: this.password?.length,
+      timestamp: new Date().toISOString()
     });
     
+    // Validate stored password
     if (!this.password) {
-      console.error('No password hash stored for user:', {
-        id: this._id,
-        email: this.email
-      });
-      return false;
+      const error = new Error('No password hash stored for user');
+      error.code = 'NO_PASSWORD_HASH';
+      throw error;
     }
     
+    // Validate candidate password
     if (!candidatePassword) {
-      console.error('No candidate password provided for user:', {
-        id: this._id,
-        email: this.email
-      });
-      return false;
+      const error = new Error('No candidate password provided');
+      error.code = 'NO_CANDIDATE_PASSWORD';
+      throw error;
     }
+
+    // Ensure password is a string
+    const passwordString = candidatePassword.toString();
     
-    const isMatch = await bcrypt.compare(candidatePassword, this.password);
-    console.log('Password comparison result:', {
+    // Log before bcrypt comparison
+    console.log('Attempting bcrypt compare:', {
+      userId: this._id,
+      email: this.email,
+      candidateLength: passwordString.length,
+      storedHashLength: this.password.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Perform comparison
+    const isMatch = await bcrypt.compare(passwordString, this.password);
+    
+    // Log result
+    console.log('Password comparison completed:', {
       userId: this._id,
       email: this.email,
       isMatch: isMatch,
-      candidateLength: candidatePassword.length,
-      passwordLength: this.password.length
+      candidateLength: passwordString.length,
+      storedHashLength: this.password.length,
+      timestamp: new Date().toISOString()
     });
     
     return isMatch;
   } catch (error) {
-    console.error('Error comparing passwords:', {
+    // Log detailed error information
+    console.error('Password comparison error:', {
       userId: this._id,
       email: this.email,
-      error: {
-        message: error.message,
-        stack: error.stack
-      }
+      errorCode: error.code,
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      timestamp: new Date().toISOString()
     });
-    throw error; // Propagate the error to be handled by the login route
+
+    // Rethrow with more context
+    const enhancedError = new Error(`Password comparison failed: ${error.message}`);
+    enhancedError.originalError = error;
+    enhancedError.code = error.code;
+    throw enhancedError;
   }
 };
 

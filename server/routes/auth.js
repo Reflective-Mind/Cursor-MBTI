@@ -149,7 +149,8 @@ router.post('/login', async (req, res) => {
       headers: {
         'content-type': req.headers['content-type'],
         origin: req.headers.origin
-      }
+      },
+      timestamp: new Date().toISOString()
     });
 
     const { email, password } = req.body;
@@ -173,19 +174,47 @@ router.post('/login', async (req, res) => {
         email: user.email,
         hasPassword: !!user.password,
         mbtiType: user.mbtiType,
-        status: user.status
+        status: user.status,
+        timestamp: new Date().toISOString()
       });
 
       // Check password
-      const isMatch = await user.comparePassword(password);
-      console.log('Password check result:', {
-        userId: user._id,
-        isMatch: isMatch
-      });
+      try {
+        const isMatch = await user.comparePassword(password);
+        console.log('Password check result:', {
+          userId: user._id,
+          isMatch: isMatch,
+          timestamp: new Date().toISOString()
+        });
 
-      if (!isMatch) {
-        console.log('Invalid password for user:', email.toLowerCase());
-        return res.status(401).json({ message: 'Invalid credentials' });
+        if (!isMatch) {
+          console.log('Invalid password for user:', email.toLowerCase());
+          return res.status(401).json({ message: 'Invalid credentials' });
+        }
+      } catch (passwordError) {
+        console.error('Password comparison error:', {
+          userId: user._id,
+          email: user.email,
+          error: {
+            code: passwordError.code,
+            message: passwordError.message,
+            stack: passwordError.stack
+          },
+          timestamp: new Date().toISOString()
+        });
+        
+        // Handle specific password comparison errors
+        if (passwordError.code === 'NO_PASSWORD_HASH') {
+          return res.status(500).json({ message: 'Account configuration error' });
+        }
+        if (passwordError.code === 'NO_CANDIDATE_PASSWORD') {
+          return res.status(400).json({ message: 'Password is required' });
+        }
+        
+        return res.status(500).json({ 
+          message: 'Error during authentication',
+          details: process.env.NODE_ENV === 'development' ? passwordError.message : undefined
+        });
       }
 
       // Update status to online
@@ -203,7 +232,8 @@ router.post('/login', async (req, res) => {
       console.log('Login successful:', {
         userId: user._id,
         email: user.email,
-        mbtiType: user.mbtiType
+        mbtiType: user.mbtiType,
+        timestamp: new Date().toISOString()
       });
 
       // Get profile sections with test breakdown
@@ -217,13 +247,17 @@ router.post('/login', async (req, res) => {
           userId: user._id,
           hasResult: !!weightedResult,
           type: weightedResult?.type,
-          testCount: weightedResult?.testBreakdown?.length
+          testCount: weightedResult?.testBreakdown?.length,
+          timestamp: new Date().toISOString()
         });
       } catch (error) {
         console.error('Error calculating weighted result:', {
           userId: user._id,
-          error: error.message,
-          stack: error.stack
+          error: {
+            message: error.message,
+            stack: error.stack
+          },
+          timestamp: new Date().toISOString()
         });
         // Don't fail login if test results calculation fails
       }
@@ -233,13 +267,17 @@ router.post('/login', async (req, res) => {
         console.log('Profile sections generated:', {
           userId: user._id,
           sectionCount: profileSections?.length,
-          firstSection: profileSections?.[0]?.title
+          firstSection: profileSections?.[0]?.title,
+          timestamp: new Date().toISOString()
         });
       } catch (error) {
         console.error('Error generating profile sections:', {
           userId: user._id,
-          error: error.message,
-          stack: error.stack
+          error: {
+            message: error.message,
+            stack: error.stack
+          },
+          timestamp: new Date().toISOString()
         });
         // Don't fail login if profile sections generation fails
         profileSections = [];
@@ -258,12 +296,14 @@ router.post('/login', async (req, res) => {
 
       res.json(response);
     } catch (error) {
-      console.error('User lookup or password comparison error:', {
+      console.error('User lookup or authentication error:', {
         email: email.toLowerCase(),
         error: {
+          name: error.name,
           message: error.message,
           stack: error.stack
-        }
+        },
+        timestamp: new Date().toISOString()
       });
       res.status(500).json({ 
         message: 'Error during authentication',
@@ -277,7 +317,8 @@ router.post('/login', async (req, res) => {
       body: {
         ...req.body,
         password: '[REDACTED]'
-      }
+      },
+      timestamp: new Date().toISOString()
     });
     res.status(500).json({ 
       message: 'Error logging in',
