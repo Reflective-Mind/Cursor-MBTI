@@ -278,7 +278,6 @@ userSchema.methods.getPublicProfile = function() {
 userSchema.methods.getProfileSections = async function(weightedResult) {
   const TestResult = mongoose.model('TestResult');
   
-  // If no weighted result provided, calculate it
   if (!weightedResult) {
     try {
       weightedResult = await TestResult.calculateWeightedType(this._id);
@@ -295,11 +294,41 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
     }
   }
 
-  // Define default sections with proper structure
   const defaultSections = [];
   
   if (weightedResult) {
-    // Add personality overview section
+    // Format trait strengths for better display
+    const traitAnalysis = {
+      EI: {
+        dominant: weightedResult.percentages.E > weightedResult.percentages.I ? 'Extroversion' : 'Introversion',
+        strength: Math.abs(weightedResult.percentages.E - weightedResult.percentages.I),
+        description: weightedResult.percentages.E > weightedResult.percentages.I ?
+          `Prefers social interaction and external engagement (${weightedResult.percentages.E}% E)` :
+          `Values internal reflection and personal space (${weightedResult.percentages.I}% I)`
+      },
+      SN: {
+        dominant: weightedResult.percentages.S > weightedResult.percentages.N ? 'Sensing' : 'Intuition',
+        strength: Math.abs(weightedResult.percentages.S - weightedResult.percentages.N),
+        description: weightedResult.percentages.S > weightedResult.percentages.N ?
+          `Focuses on concrete facts and practical details (${weightedResult.percentages.S}% S)` :
+          `Sees patterns and explores possibilities (${weightedResult.percentages.N}% N)`
+      },
+      TF: {
+        dominant: weightedResult.percentages.T > weightedResult.percentages.F ? 'Thinking' : 'Feeling',
+        strength: Math.abs(weightedResult.percentages.T - weightedResult.percentages.F),
+        description: weightedResult.percentages.T > weightedResult.percentages.F ?
+          `Makes decisions through logical analysis (${weightedResult.percentages.T}% T)` :
+          `Considers human impact in decisions (${weightedResult.percentages.F}% F)`
+      },
+      JP: {
+        dominant: weightedResult.percentages.J > weightedResult.percentages.P ? 'Judging' : 'Perceiving',
+        strength: Math.abs(weightedResult.percentages.J - weightedResult.percentages.P),
+        description: weightedResult.percentages.J > weightedResult.percentages.P ?
+          `Prefers structure and planning (${weightedResult.percentages.J}% J)` :
+          `Values flexibility and adaptability (${weightedResult.percentages.P}% P)`
+      }
+    };
+
     defaultSections.push({
       id: 'personality',
       title: weightedResult.profileTitle,
@@ -314,7 +343,7 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
         {
           id: 'trait-strengths',
           title: 'Trait Analysis',
-          description: weightedResult.traitStrengths,
+          description: traitAnalysis,
           contentType: 'traits'
         },
         {
@@ -329,9 +358,7 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
     });
   }
 
-  // Add existing custom sections
   if (this.profileSections && this.profileSections.length > 0) {
-    // Only add non-personality sections
     const customSections = this.profileSections.filter(section => 
       section.type !== 'personality' && section.id !== 'personality'
     );
@@ -400,18 +427,14 @@ userSchema.methods.generateAIStory = async function() {
       throw new Error('No test results available');
     }
 
-    // Get weighted type and trait strengths
     const weightedResult = await TestResult.calculateWeightedType(this._id);
     if (!weightedResult) {
       throw new Error('Could not calculate weighted personality type');
     }
 
     const { type, percentages } = weightedResult;
-
-    // Collect all answers from all tests
     const allAnswers = results.flatMap(result => result.answers || []);
     
-    // Group answers by category
     const answersByCategory = {
       EI: allAnswers.filter(a => a.category === 'EI'),
       SN: allAnswers.filter(a => a.category === 'SN'),
@@ -419,118 +442,97 @@ userSchema.methods.generateAIStory = async function() {
       JP: allAnswers.filter(a => a.category === 'JP')
     };
 
-    // Generate personalized introduction
-    let story = `Based on your personality assessment responses, I can tell you're someone who `;
+    let story = `This individual has a distinct ${type} personality profile. `;
+
+    // Core personality analysis
+    const traits = [];
 
     // E/I Analysis
     if (percentages.E > percentages.I) {
-      story += `draws energy from social interactions and the external world. Your answers indicate you ${
-        answersByCategory.EI.some(a => a.answer === 'E') ? 
-        'enjoy engaging with others, expressing your thoughts openly, and being part of group activities. ' :
-        'generally prefer collaborative environments and social settings. '
-      }`;
+      const socialAnswers = answersByCategory.EI.filter(a => a.answer === 'E');
+      traits.push(`They are energized by social interaction (${percentages.E}% Extroverted), particularly ${
+        socialAnswers.length > 0 ? 
+        'showing enthusiasm for ' + socialAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'in collaborative and group settings'
+      }`);
     } else {
-      story += `values internal reflection and personal space. Your answers show you ${
-        answersByCategory.EI.some(a => a.answer === 'I') ?
-        'appreciate time alone to recharge, think deeply, and process information internally. ' :
-        'tend to be more reserved and thoughtful in your interactions. '
-      }`;
+      const introvertAnswers = answersByCategory.EI.filter(a => a.answer === 'I');
+      traits.push(`They find strength in introspection (${percentages.I}% Introverted), particularly ${
+        introvertAnswers.length > 0 ?
+        'valuing ' + introvertAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'appreciating time for internal processing'
+      }`);
     }
 
     // S/N Analysis
     if (percentages.S > percentages.N) {
-      story += `You have a practical mindset and ${
-        answersByCategory.SN.some(a => a.answer === 'S') ?
-        'pay close attention to concrete details and real-world applications. Your responses show you trust experience and prefer working with tangible facts. ' :
-        'focus on the present moment and practical solutions. '
-      }`;
+      const sensingAnswers = answersByCategory.SN.filter(a => a.answer === 'S');
+      traits.push(`Their practical mindset (${percentages.S}% Sensing) is evident in ${
+        sensingAnswers.length > 0 ?
+        'their approach to ' + sensingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'their focus on concrete facts and real-world applications'
+      }`);
     } else {
-      story += `You have an imaginative approach and ${
-        answersByCategory.SN.some(a => a.answer === 'N') ?
-        'enjoy exploring possibilities and discovering patterns. Your answers reveal a natural curiosity about future implications and abstract concepts. ' :
-        'tend to look for deeper meanings and connections in situations. '
-      }`;
+      const intuitionAnswers = answersByCategory.SN.filter(a => a.answer === 'N');
+      traits.push(`Their intuitive nature (${percentages.N}% Intuitive) shines through in ${
+        intuitionAnswers.length > 0 ?
+        'their way of ' + intuitionAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'their ability to see patterns and future possibilities'
+      }`);
     }
 
     // T/F Analysis
     if (percentages.T > percentages.F) {
-      story += `When making decisions, you ${
-        answersByCategory.TF.some(a => a.answer === 'T') ?
-        'prioritize logical analysis and objective criteria. Your responses indicate you value consistency and approach problems with systematic thinking. ' :
-        'tend to rely on rational analysis and impartial evaluation. '
-      }`;
+      const thinkingAnswers = answersByCategory.TF.filter(a => a.answer === 'T');
+      traits.push(`In decision-making (${percentages.T}% Thinking), they excel at ${
+        thinkingAnswers.length > 0 ?
+        'applying logic to ' + thinkingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'analyzing situations objectively and systematically'
+      }`);
     } else {
-      story += `In decision-making, you ${
-        answersByCategory.TF.some(a => a.answer === 'F') ?
-        'consider personal values and the human element. Your answers show you care deeply about harmony and the impact on others. ' :
-        'prioritize emotional intelligence and understanding others\' perspectives. '
-      }`;
+      const feelingAnswers = answersByCategory.TF.filter(a => a.answer === 'F');
+      traits.push(`Their decision-making process (${percentages.F}% Feeling) is characterized by ${
+        feelingAnswers.length > 0 ?
+        'strong consideration of ' + feelingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'deep awareness of human values and emotional impact'
+      }`);
     }
 
     // J/P Analysis
     if (percentages.J > percentages.P) {
-      story += `Your approach to life is ${
-        answersByCategory.JP.some(a => a.answer === 'J') ?
-        'structured and organized. You\'ve indicated a preference for planning ahead and completing tasks systematically. ' :
-        'generally methodical and planned. '
-      }`;
+      const judgingAnswers = answersByCategory.JP.filter(a => a.answer === 'J');
+      traits.push(`Their structured approach to life (${percentages.J}% Judging) is demonstrated through ${
+        judgingAnswers.length > 0 ?
+        'their preference for ' + judgingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'their systematic and organized way of handling tasks'
+      }`);
     } else {
-      story += `Your lifestyle is ${
-        answersByCategory.JP.some(a => a.answer === 'P') ?
-        'flexible and adaptable. Your responses show you enjoy keeping options open and adapting to new information as it comes. ' :
-        'spontaneous and open to changes. '
-      }`;
+      const perceivingAnswers = answersByCategory.JP.filter(a => a.answer === 'P');
+      traits.push(`Their adaptable nature (${percentages.P}% Perceiving) is reflected in ${
+        perceivingAnswers.length > 0 ?
+        'their enjoyment of ' + perceivingAnswers.map(a => a.question?.toLowerCase()).filter(q => q).join(' and ') :
+        'their flexible and spontaneous approach to life'
+      }`);
     }
 
-    // Add unique characteristics based on specific answer combinations
-    const uniqueTraits = [];
-    
-    if (answersByCategory.EI.some(a => a.answer === 'E') && 
-        answersByCategory.TF.some(a => a.answer === 'F')) {
-      uniqueTraits.push("You're naturally empathetic and enjoy connecting with others on a personal level");
+    // Combine traits into a flowing narrative
+    story += traits.join('. ') + '.';
+
+    // Add unique combinations insight if present
+    const uniqueCombinations = [];
+    if (percentages.E > percentages.I && percentages.F > percentages.T) {
+      uniqueCombinations.push("Their combination of extroversion and emotional awareness makes them particularly skilled at building and maintaining meaningful relationships");
     }
-    
-    if (answersByCategory.SN.some(a => a.answer === 'N') && 
-        answersByCategory.JP.some(a => a.answer === 'P')) {
-      uniqueTraits.push("You have a creative and flexible approach to problem-solving");
+    if (percentages.S > percentages.N && percentages.J > percentages.P) {
+      uniqueCombinations.push("Their practical mindset combined with organizational skills enables them to effectively turn plans into reality");
     }
-    
-    if (answersByCategory.TF.some(a => a.answer === 'T') && 
-        answersByCategory.JP.some(a => a.answer === 'J')) {
-      uniqueTraits.push("You excel at systematic analysis and organized execution");
+    if (percentages.N > percentages.S && percentages.F > percentages.T) {
+      uniqueCombinations.push("Their intuitive understanding of patterns combined with emotional intelligence gives them unique insight into human dynamics");
     }
 
-    if (uniqueTraits.length > 0) {
-      story += "\n\nWhat makes you unique: " + uniqueTraits.join(". ") + ".";
+    if (uniqueCombinations.length > 0) {
+      story += "\n\nNotable characteristics: " + uniqueCombinations.join(". ") + ".";
     }
-
-    // Add personalized insights
-    story += "\n\nYour responses reveal that you're someone who ";
-    
-    // Add specific examples based on actual answers
-    const significantAnswers = allAnswers.filter(answer => {
-      const category = answer.category;
-      const dominantPreference = percentages[answer.answer] > percentages[category.replace(answer.answer, '')];
-      return dominantPreference;
-    });
-
-    if (significantAnswers.length > 0) {
-      const examples = significantAnswers
-        .slice(0, 3)
-        .map(answer => answer.question)
-        .filter(q => q);
-      
-      if (examples.length > 0) {
-        story += "consistently demonstrates these traits in situations like " + 
-                 examples.map(q => q.toLowerCase()).join(", ") + ".";
-      }
-    }
-
-    // Add growth perspective
-    story += "\n\nWhile you show clear preferences in your personality type, remember that personal growth often comes from developing both aspects of each trait. ";
-    
-    // Add balanced conclusion
-    story += `Your ${type} personality type is not just a label, but a reflection of your unique way of engaging with the world and others around you.`;
 
     return story;
   } catch (error) {
