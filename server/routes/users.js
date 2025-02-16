@@ -378,12 +378,12 @@ router.delete('/:userId/sections/:sectionId', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Cannot delete default sections
-    const section = user.profileSections.find(s => s.id === req.params.sectionId);
-    if (!section || section.type === 'default') {
-      return res.status(400).json({ message: 'Cannot delete this section' });
+    // Only protect the main personality overview section
+    if (req.params.sectionId === 'personality') {
+      return res.status(400).json({ message: 'Cannot delete the main personality section' });
     }
 
+    // Allow deleting any other section, including AI story
     user.profileSections = user.profileSections.filter(s => s.id !== req.params.sectionId);
     await user.save();
 
@@ -520,53 +520,48 @@ router.put('/me', auth, async (req, res) => {
 // Generate AI Story
 router.post('/:userId/generate-story', auth, async (req, res) => {
   try {
+    if (req.params.userId !== req.user.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
     const user = await User.findById(req.params.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check if user has test results
-    const TestResult = mongoose.model('TestResult');
-    const results = await TestResult.find({ user: user._id });
-    if (!results || results.length === 0) {
-      return res.status(400).json({ message: 'No test results available' });
-    }
-
-    // Generate story
+    // Generate the AI story
     const story = await user.generateAIStory();
     
-    // Create or update story section
-    const storySection = {
-      id: 'personality-story',
-      title: 'Your Personality Story',
+    // Create a unique ID for the new section
+    const timestamp = Date.now();
+    const sectionId = `ai-story-${timestamp}`;
+    
+    // Create new section with the story
+    const newSection = {
+      id: sectionId,
+      title: 'Your Personality Deep Dive',
       type: 'personality',
       content: [{
-        id: 'story',
-        title: 'Detailed Analysis',
+        id: `story-${timestamp}`,
+        title: 'AI Generated Analysis',
         description: story,
         contentType: 'text'
       }],
-      order: 1,
+      order: user.profileSections.length,
       isVisible: true
     };
 
-    // Update user's profile sections
-    const existingSectionIndex = user.profileSections.findIndex(s => s.id === 'personality-story');
-    if (existingSectionIndex >= 0) {
-      user.profileSections[existingSectionIndex] = storySection;
-    } else {
-      user.profileSections.push(storySection);
-    }
-
+    // Add the new section
+    user.profileSections.push(newSection);
     await user.save();
 
     res.json({ 
-      message: 'Story generated successfully',
-      section: storySection
+      message: 'AI story generated successfully',
+      section: newSection
     });
   } catch (error) {
-    console.error('Error generating story:', error);
-    res.status(500).json({ message: 'Error generating personality story' });
+    console.error('Error generating AI story:', error);
+    res.status(500).json({ message: 'Error generating AI story', details: error.message });
   }
 });
 
