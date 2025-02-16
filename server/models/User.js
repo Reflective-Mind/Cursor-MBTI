@@ -270,7 +270,19 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
   
   // If no weighted result provided, calculate it
   if (!weightedResult) {
-    weightedResult = await TestResult.calculateWeightedType(this._id);
+    try {
+      weightedResult = await TestResult.calculateWeightedType(this._id);
+    } catch (error) {
+      console.error('Error calculating weighted type:', {
+        userId: this._id,
+        error: {
+          message: error.message,
+          stack: error.stack
+        },
+        timestamp: new Date().toISOString()
+      });
+      weightedResult = null;
+    }
   }
 
   // Define default sections with proper structure
@@ -288,18 +300,18 @@ userSchema.methods.getProfileSections = async function(weightedResult) {
       {
         id: 'trait-strengths',
         title: 'Trait Strengths',
-        description: weightedResult ? formatTraitStrengths(weightedResult) : null,
+        description: formatTraitStrengths(weightedResult),
         contentType: 'traits'
       },
       {
         id: 'test-breakdown',
         title: 'Test Results Breakdown',
-        description: weightedResult ? formatTestBreakdown(weightedResult) : null,
+        description: formatTestBreakdown(weightedResult),
         contentType: 'breakdown'
       }
     ],
-    order: this.defaultSections.personality.order,
-    isVisible: this.defaultSections.personality.isVisible
+    order: this.defaultSections?.personality?.order || 0,
+    isVisible: this.defaultSections?.personality?.isVisible !== false
   }];
 
   return defaultSections;
@@ -335,47 +347,54 @@ function generatePersonalityOverview(weightedResult) {
 }
 
 function formatTraitStrengths(weightedResult) {
+  if (!weightedResult || !weightedResult.traitStrengths || !weightedResult.percentages) {
+    return [];
+  }
+
   const { traitStrengths, percentages } = weightedResult;
   
-  return {
-    pairs: [
-      {
-        trait1: { letter: 'E', score: percentages.E },
-        trait2: { letter: 'I', score: percentages.I },
-        strength: traitStrengths.EI
-      },
-      {
-        trait1: { letter: 'S', score: percentages.S },
-        trait2: { letter: 'N', score: percentages.N },
-        strength: traitStrengths.SN
-      },
-      {
-        trait1: { letter: 'T', score: percentages.T },
-        trait2: { letter: 'F', score: percentages.F },
-        strength: traitStrengths.TF
-      },
-      {
-        trait1: { letter: 'J', score: percentages.J },
-        trait2: { letter: 'P', score: percentages.P },
-        strength: traitStrengths.JP
-      }
-    ]
-  };
+  return [
+    {
+      trait1: { letter: 'E', score: percentages.E || 0 },
+      trait2: { letter: 'I', score: percentages.I || 0 },
+      strength: traitStrengths.EI || 0
+    },
+    {
+      trait1: { letter: 'S', score: percentages.S || 0 },
+      trait2: { letter: 'N', score: percentages.N || 0 },
+      strength: traitStrengths.SN || 0
+    },
+    {
+      trait1: { letter: 'T', score: percentages.T || 0 },
+      trait2: { letter: 'F', score: percentages.F || 0 },
+      strength: traitStrengths.TF || 0
+    },
+    {
+      trait1: { letter: 'J', score: percentages.J || 0 },
+      trait2: { letter: 'P', score: percentages.P || 0 },
+      strength: traitStrengths.JP || 0
+    }
+  ];
 }
 
 function formatTestBreakdown(weightedResult) {
-  const { testBreakdown } = weightedResult;
-  
-  return {
-    tests: testBreakdown.map(test => ({
-      category: test.category,
-      type: test.type,
-      baseWeight: test.baseWeight,
-      effectiveWeight: test.effectiveWeight,
-      date: test.date,
-      percentages: test.percentages
-    }))
-  };
+  if (!weightedResult || !weightedResult.testBreakdown) {
+    return [];
+  }
+
+  return weightedResult.testBreakdown.map(test => ({
+    category: test.category || '',
+    type: test.type || '',
+    baseWeight: test.baseWeight || 0,
+    effectiveWeight: test.effectiveWeight || 0,
+    date: test.date || new Date(),
+    percentages: test.percentages || {
+      E: 0, I: 0,
+      S: 0, N: 0,
+      T: 0, F: 0,
+      J: 0, P: 0
+    }
+  }));
 }
 
 const User = mongoose.model('User', userSchema);

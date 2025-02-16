@@ -28,6 +28,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Tooltip,
+  LinearProgress,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -53,6 +54,111 @@ import {
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+
+const TraitStrengths = ({ data }) => {
+  if (!Array.isArray(data)) {
+    console.error('Invalid trait strengths data:', data);
+    return null;
+  }
+
+  return (
+    <Grid container spacing={2}>
+      {data.map((pair, index) => (
+        <Grid item xs={12} key={index}>
+          <Card variant="outlined">
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h6">{pair.trait1.letter}</Typography>
+                  <Typography variant="body2">({pair.trait1.score}%)</Typography>
+                </Box>
+                <Typography variant="body2">vs</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h6">{pair.trait2.letter}</Typography>
+                  <Typography variant="body2">({pair.trait2.score}%)</Typography>
+                </Box>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={pair.trait1.score}
+                sx={{ 
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: 'grey.200',
+                  '& .MuiLinearProgress-bar': {
+                    borderRadius: 4,
+                  }
+                }} 
+              />
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 1 }}>
+                Strength: {Math.round(pair.strength)}%
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      ))}
+    </Grid>
+  );
+};
+
+const TestBreakdown = ({ data }) => {
+  if (!Array.isArray(data)) {
+    console.error('Invalid test breakdown data:', data);
+    return null;
+  }
+
+  return (
+    <Grid container spacing={2}>
+      {data.map((test, index) => (
+        <Grid item xs={12} key={index}>
+          <Card variant="outlined">
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="h6">
+                  {test.category}
+                </Typography>
+                <Chip 
+                  label={`${test.effectiveWeight}% weight`}
+                  color="primary"
+                  size="small"
+                />
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Type: {test.type}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Taken: {new Date(test.date).toLocaleDateString()}
+              </Typography>
+              <Box sx={{ mt: 2 }}>
+                <Grid container spacing={1}>
+                  {Object.entries(test.percentages).map(([trait, score]) => (
+                    <Grid item xs={6} key={trait}>
+                      <Typography variant="body2">
+                        {trait}: {Math.round(score)}%
+                      </Typography>
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={score}
+                        sx={{ 
+                          height: 4,
+                          borderRadius: 2,
+                          backgroundColor: 'grey.200',
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 2,
+                          }
+                        }} 
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      ))}
+    </Grid>
+  );
+};
 
 const Profile = () => {
   const theme = useTheme();
@@ -505,15 +611,23 @@ const Profile = () => {
           </Box>
         </AccordionSummary>
         <AccordionDetails sx={{ p: 2, backgroundColor: 'background.paper' }}>
-          <Typography 
-            variant="body1" 
-            sx={{ 
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word'
-            }}
-          >
-            {item.description || item.content || ''}
-          </Typography>
+          {item.contentType === 'text' && (
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}
+            >
+              {item.description}
+            </Typography>
+          )}
+          {item.contentType === 'traits' && (
+            <TraitStrengths data={item.description} />
+          )}
+          {item.contentType === 'breakdown' && (
+            <TestBreakdown data={item.description} />
+          )}
         </AccordionDetails>
       </Accordion>
     );
