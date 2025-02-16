@@ -248,7 +248,7 @@ userSchema.methods.getProfileSections = async function() {
     personality: {
       id: 'personality',
       title: weightedResult ? 
-        `MBTI Type: ${weightedResult.type} - ${weightedResult.profileTitle.split(' - ')[1]}` :
+        `${weightedResult.type} - ${weightedResult.profileTitle.split(' - ')[1]}` :
         `${this.mbtiType || 'Unknown'} - Take the MBTI Test`,
       type: 'default',
       content: [
@@ -367,21 +367,23 @@ function generatePersonalityOverview(weightedResult) {
       .filter(t => t.strength <= 15)
       .map(t => t.name);
 
-    return `Your test results show balanced preferences in ${balancedTraits.join(', ')}. To get a more definitive type assessment, consider taking the comprehensive MBTI-100 test which provides the most accurate results.`;
+    if (balancedTraits.length > 0) {
+      return `Your test results show balanced preferences in ${balancedTraits.join(', ')}. To get a more definitive type assessment, consider taking the comprehensive MBTI-100 test which provides the most accurate results.`;
+    }
   }
 
   const traits = [
-    { name: 'Extroversion-Introversion', trait: weightedResult.dominantTraits.attitude, strength: weightedResult.traitStrengths.EI },
-    { name: 'Sensing-Intuition', trait: weightedResult.dominantTraits.perception, strength: weightedResult.traitStrengths.SN },
-    { name: 'Thinking-Feeling', trait: weightedResult.dominantTraits.judgment, strength: weightedResult.traitStrengths.TF },
-    { name: 'Judging-Perceiving', trait: weightedResult.dominantTraits.lifestyle, strength: weightedResult.traitStrengths.JP }
+    { name: 'Extroversion-Introversion', trait: weightedResult.dominantTraits.attitude, strength: weightedResult.traitStrengths.EI, score: weightedResult.percentages[weightedResult.type[0]] },
+    { name: 'Sensing-Intuition', trait: weightedResult.dominantTraits.perception, strength: weightedResult.traitStrengths.SN, score: weightedResult.percentages[weightedResult.type[1]] },
+    { name: 'Thinking-Feeling', trait: weightedResult.dominantTraits.judgment, strength: weightedResult.traitStrengths.TF, score: weightedResult.percentages[weightedResult.type[2]] },
+    { name: 'Judging-Perceiving', trait: weightedResult.dominantTraits.lifestyle, strength: weightedResult.traitStrengths.JP, score: weightedResult.percentages[weightedResult.type[3]] }
   ];
 
   const strongestTraits = traits
     .sort((a, b) => b.strength - a.strength)
     .slice(0, 2);
 
-  return `Based on your weighted test results, you show a ${weightedResult.type} personality type. Your strongest traits are ${strongestTraits[0].trait} (${strongestTraits[0].strength}% preference) and ${strongestTraits[1].trait} (${strongestTraits[1].strength}% preference). This combination creates a unique perspective that influences how you interact with the world, make decisions, and process information.`;
+  return `Based on your weighted test results, you show a ${weightedResult.type} personality type. Your strongest traits are ${strongestTraits[0].trait} (${strongestTraits[0].score}% preference) and ${strongestTraits[1].trait} (${strongestTraits[1].score}% preference). This combination creates a unique perspective that influences how you interact with the world, make decisions, and process information.`;
 }
 
 // Helper function to format trait strengths
@@ -397,7 +399,7 @@ function formatTraitStrengths(weightedResult) {
 ${trait.name}:
 ${trait.e}: ${trait.eScore}% | ${trait.i}: ${trait.iScore}%
 Preference Strength: ${trait.strength}%
-${trait.strength <= 10 ? '(Balanced preference)' : `(Clear ${trait.eScore > trait.iScore ? trait.e : trait.i} preference)`}
+${trait.strength <= 15 ? '(Consider taking MBTI-100 for clearer preference)' : `(Clear ${trait.eScore > trait.iScore ? trait.e : trait.i} preference)`}
   `).join('\n\n');
 }
 

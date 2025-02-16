@@ -94,9 +94,9 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     const weight = this.TEST_WEIGHTS[result.testCategory];
     weightedScores.totalWeight += weight;
 
-    // Apply weight to each trait score
+    // Apply weight to each trait score with emphasis on test category
     Object.entries(result.result.percentages).forEach(([trait, value]) => {
-      weightedScores[trait] += value * weight;
+      weightedScores[trait] += value * weight * (1 + weight); // Increase influence of higher weighted tests
     });
   });
 
@@ -112,8 +112,10 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     const total = score1 + score2;
     
     if (total > 0) {
-      // Calculate normalized scores based on weighted contributions
-      normalizedScores[trait1] = Math.round((score1 / total) * 100);
+      // Calculate normalized scores with weighted bias
+      const weightedBias = Math.min(0.1, weightedScores.totalWeight * 0.05); // Add slight bias based on total weight
+      const rawScore1 = (score1 / total);
+      normalizedScores[trait1] = Math.round((rawScore1 + (rawScore1 > 0.5 ? weightedBias : -weightedBias)) * 100);
       normalizedScores[trait2] = 100 - normalizedScores[trait1];
     } else {
       // Default to neutral only if no data available
@@ -132,11 +134,11 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
 
   // Adjust minimum strength threshold based on test weights
   const MINIMUM_STRENGTH_THRESHOLD = Math.max(
-    15,  // Increased base threshold
-    weightedScores.totalWeight * 10  // Increased weighted threshold
+    15,  // Base threshold
+    weightedScores.totalWeight * 8  // Weighted threshold adjustment
   );
 
-  // Determine final type based on normalized scores and adjusted threshold
+  // Determine final type based on normalized scores
   const finalType = [
     normalizedScores.E > normalizedScores.I ? 'E' : 'I',
     normalizedScores.S > normalizedScores.N ? 'S' : 'N',
