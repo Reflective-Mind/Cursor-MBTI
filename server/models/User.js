@@ -135,6 +135,16 @@ const userSchema = new mongoose.Schema({
       default: 'classic'
     }
   },
+  sectionLimits: {
+    maxMainSections: {
+      type: Number,
+      default: 10
+    },
+    maxSubSections: {
+      type: Number,
+      default: 20
+    }
+  },
   profileSections: [profileSectionSchema],
   defaultSections: {
     personality: {
@@ -378,30 +388,101 @@ userSchema.methods.generateAIStory = async function() {
     }, 0);
 
     // Generate comprehensive story
-    let story = `Based on your ${totalQuestions} answered questions across ${results.length} test(s), here's a detailed analysis of your personality type ${type}:\n\n`;
+    let story = `Your Personality Deep Dive\n\n`;
+    story += `Based on a comprehensive analysis of your ${totalQuestions} responses across ${results.length} test(s), here's an in-depth look at your personality profile:\n\n`;
 
-    // Add trait analysis
+    // Core Type Analysis
+    story += `Core Personality Type: ${type}\n`;
+    story += `Your personality type combines the following core aspects:\n`;
+    
+    // Add detailed trait analysis
     const categories = ['EI', 'SN', 'TF', 'JP'];
+    const traitDescriptions = {
+      E: {
+        high: 'You are strongly energized by social interaction and external engagement. You think best when sharing ideas with others and prefer collaborative environments.',
+        moderate: 'You are comfortable in social situations while also valuing some alone time. You can adapt between group work and solo activities.',
+        low: 'While you can engage socially when needed, you prefer smaller groups and may need time alone to recharge.'
+      },
+      I: {
+        high: 'You have a strong preference for internal reflection and deep thinking. You process information best when given time to consider it privately.',
+        moderate: 'You balance internal reflection with external engagement well. You can work independently while still maintaining social connections.',
+        low: 'While you value introspection, you also recognize the benefits of external input and group interaction.'
+      },
+      S: {
+        high: 'You have a strong focus on concrete facts and practical applications. You trust experience and pay careful attention to details in the present moment.',
+        moderate: 'You balance practical considerations with abstract possibilities. You can work with both detailed facts and broader concepts.',
+        low: 'While you appreciate concrete information, you also see value in exploring theoretical possibilities.'
+      },
+      N: {
+        high: 'You have a strong preference for patterns and possibilities. You naturally see connections between concepts and enjoy thinking about future implications.',
+        moderate: 'You combine intuitive insights with practical considerations. You can work with both abstract ideas and concrete details.',
+        low: 'While you enjoy exploring possibilities, you also recognize the importance of practical considerations.'
+      },
+      T: {
+        high: 'You strongly prefer logical analysis and objective criteria in decision-making. You naturally seek consistency and impartial evaluation.',
+        moderate: 'You balance logical analysis with consideration of human factors. You can make decisions using both objective and subjective criteria.',
+        low: 'While you value logical consistency, you also consider the human impact of decisions.'
+      },
+      F: {
+        high: 'You have a strong focus on personal values and human factors in decision-making. You naturally consider how choices affect others.',
+        moderate: 'You combine emotional intelligence with logical consideration. You can make decisions that are both personally meaningful and objectively sound.',
+        low: 'While you prioritize human factors, you also appreciate the value of logical analysis.'
+      },
+      J: {
+        high: 'You strongly prefer structure and planning. You like to have things decided and enjoy completing tasks systematically.',
+        moderate: 'You balance structure with flexibility. You can work with both planned and spontaneous approaches.',
+        low: 'While you appreciate organization, you also see the benefits of remaining flexible and adaptable.'
+      },
+      P: {
+        high: 'You have a strong preference for flexibility and spontaneity. You naturally adapt to new information and prefer keeping options open.',
+        moderate: 'You combine adaptability with some degree of structure. You can work with both flexible and organized approaches.',
+        low: 'While you value adaptability, you also recognize the benefits of planning and organization.'
+      }
+    };
+
     for (const category of categories) {
       const traits = category.split('');
       const strength = traitStrengths[category];
       const dominantTrait = strength > 0 ? traits[0] : traits[1];
-      const score = percentages[dominantTrait];
+      const score = Math.abs(strength);
       
-      story += `\n${traits[0]}/${traits[1]} Dimension (${Math.abs(strength)}% ${dominantTrait}):\n`;
-      story += await this.analyzeAnswersForCategory(results, category);
-      story += `\nStrength: ${Math.abs(strength)}% preference for ${dominantTrait === traits[0] ? traits[0] : traits[1]}\n`;
+      story += `\n${traits[0]}/${traits[1]} Dimension (${score}% ${dominantTrait}):\n`;
+      const level = score >= 70 ? 'high' : score >= 30 ? 'moderate' : 'low';
+      story += traitDescriptions[dominantTrait][level] + '\n';
     }
 
-    // Add test breakdown
-    story += '\n\nTest History:\n';
-    for (const test of testBreakdown) {
-      const date = new Date(test.date).toLocaleDateString();
-      story += `- ${test.category} (${Math.round(test.effectiveWeight)}% contribution) taken on ${date}: ${test.type}\n`;
+    // Add interaction style analysis
+    story += '\nInteraction Style:\n';
+    const isExtroverted = percentages.E > percentages.I;
+    const isJudging = percentages.J > percentages.P;
+    
+    if (isExtroverted && isJudging) {
+      story += 'You tend to be action-oriented and organized, often taking charge in group situations.\n';
+    } else if (isExtroverted && !isJudging) {
+      story += 'You are adaptable and energetic, bringing spontaneity and enthusiasm to social situations.\n';
+    } else if (!isExtroverted && isJudging) {
+      story += 'You prefer structured environments and thoughtful planning, working methodically towards goals.\n';
+    } else {
+      story += 'You are reflective and flexible, adapting to situations while maintaining your independence.\n';
     }
 
-    // Add recommendations
-    story += '\n\nRecommendations for Growth:\n';
+    // Add learning and communication style
+    story += '\nLearning and Communication Style:\n';
+    const isSensing = percentages.S > percentages.N;
+    const isThinking = percentages.T > percentages.F;
+    
+    if (isSensing && isThinking) {
+      story += 'You learn best through practical experience and prefer clear, factual communication.\n';
+    } else if (isSensing && !isThinking) {
+      story += 'You appreciate hands-on learning and value personal connection in communication.\n';
+    } else if (!isSensing && isThinking) {
+      story += 'You enjoy theoretical learning and prefer logical, systematic discussions.\n';
+    } else {
+      story += 'You learn through exploring possibilities and value authentic, meaningful communication.\n';
+    }
+
+    // Add growth recommendations
+    story += '\nPersonal Growth Opportunities:\n';
     for (const category of categories) {
       const traits = category.split('');
       const strength = traitStrengths[category];
@@ -411,9 +492,20 @@ userSchema.methods.generateAIStory = async function() {
       if (Math.abs(strength) > 70) {
         story += `- Consider developing your ${recessiveTrait} side to balance your strong ${dominantTrait} preference\n`;
       } else if (Math.abs(strength) < 30) {
-        story += `- Your balanced ${traits[0]}/${traits[1]} preference allows you to adapt well. Continue developing both aspects\n`;
+        story += `- Your balanced ${traits[0]}/${traits[1]} approach is an asset. Continue developing both aspects\n`;
       }
     }
+
+    // Add test history
+    story += '\nTest History and Development:\n';
+    testBreakdown.forEach(test => {
+      const date = new Date(test.date).toLocaleDateString();
+      story += `- ${test.category} (${Math.round(test.effectiveWeight)}% contribution) taken on ${date}\n`;
+      story += `  Result: ${test.type} with notable ${Object.entries(test.percentages)
+        .filter(([_, score]) => score >= 70)
+        .map(([trait, score]) => `${trait}:${score}%`)
+        .join(', ')} preferences\n`;
+    });
 
     return story;
   } catch (error) {
