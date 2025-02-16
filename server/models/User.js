@@ -172,32 +172,46 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
       id: this._id,
       email: this.email,
       hasPassword: !!this.password,
-      candidateLength: candidatePassword?.length
+      candidateLength: candidatePassword?.length,
+      passwordLength: this.password?.length
     });
     
     if (!this.password) {
-      console.error('No password hash stored for user:', this._id);
+      console.error('No password hash stored for user:', {
+        id: this._id,
+        email: this.email
+      });
       return false;
     }
     
     if (!candidatePassword) {
-      console.error('No candidate password provided for user:', this._id);
+      console.error('No candidate password provided for user:', {
+        id: this._id,
+        email: this.email
+      });
       return false;
     }
     
     const isMatch = await bcrypt.compare(candidatePassword, this.password);
     console.log('Password comparison result:', {
       userId: this._id,
-      isMatch: isMatch
+      email: this.email,
+      isMatch: isMatch,
+      candidateLength: candidatePassword.length,
+      passwordLength: this.password.length
     });
     
     return isMatch;
   } catch (error) {
     console.error('Error comparing passwords:', {
       userId: this._id,
-      error: error.message
+      email: this.email,
+      error: {
+        message: error.message,
+        stack: error.stack
+      }
     });
-    return false;
+    throw error; // Propagate the error to be handled by the login route
   }
 };
 
