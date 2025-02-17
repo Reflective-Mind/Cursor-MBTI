@@ -49,6 +49,14 @@ const auth = require('./middleware/auth');
 const app = express();
 const server = http.createServer(app);
 
+// Enable CORS for all routes with more permissive settings
+app.use(cors({
+  origin: true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
+
 // Debug middleware to log all requests
 app.use((req, res, next) => {
   console.log('Incoming request:', {
@@ -79,58 +87,41 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'https://cursor-mbti.vercel.app',
-      'https://mbti-render.onrender.com'
-    ];
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Origin not allowed:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+// Add middleware to handle preflight requests
+app.options('*', cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    'https://mbti-render.onrender.com',
+    'https://cursor-mbti.vercel.app'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'Content-Type']
-};
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
-
-// Add middleware to handle preflight requests
-app.options('*', cors(corsOptions));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+}));
 
 // Add middleware to set CORS headers for all responses
 app.use((req, res, next) => {
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3002',
+    'https://mbti-render.onrender.com',
+    'https://cursor-mbti.vercel.app'
+  ];
   const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
   }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   next();
 });
 
 // Socket.IO configuration
 const io = socketIo(server, {
   cors: {
-    origin: corsOptions.origin,
+    origin: ['http://localhost:3000', 'http://localhost:3002'],
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
@@ -155,6 +146,10 @@ app.use(morgan('dev'));
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
+
+// Serve static files from public directory
+app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -772,7 +767,7 @@ app.use((err, req, res, next) => {
       message: 'CORS error',
       details: err.message,
       origin: req.headers.origin,
-      allowedOrigins: corsOptions.allowedOrigins
+      allowedOrigins: ['http://localhost:3000', 'http://localhost:3002']
     });
   }
 

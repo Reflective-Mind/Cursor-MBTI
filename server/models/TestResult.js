@@ -90,39 +90,52 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     totalWeight: 0
   };
 
+  // Determine if we only have MBTI-8 and MBTI-24
+  const hasOnly8And24 = Object.keys(latestByCategory).length === 2 &&
+    !latestByCategory['mbti-100'] &&
+    latestByCategory['mbti-8'] &&
+    latestByCategory['mbti-24'];
+
   // Calculate weighted scores using precise test weights
   Object.values(latestByCategory).forEach(result => {
-    const weight = this.TEST_WEIGHTS[result.testCategory];
+    let weight;
+    if (hasOnly8And24) {
+      weight = result.testCategory === 'mbti-24' ? 0.75 : 0.25;
+    } else {
+      weight = this.TEST_WEIGHTS[result.testCategory];
+    }
+    
     weightedScores.totalWeight += weight;
 
-    // Apply exact weight to each trait score
+    // Apply weight to each trait score with proper normalization
     Object.entries(result.result.percentages).forEach(([trait, value]) => {
-      weightedScores[trait] += value * weight;
+      weightedScores[trait] += (value / 100) * weight;
     });
   });
-
-  // Normalize the total weight to 1.0
-  const normalizedWeight = 1.0 / weightedScores.totalWeight;
 
   // Calculate final normalized scores for each trait
   const normalizedScores = {};
   const traitPairs = [['E', 'I'], ['S', 'N'], ['T', 'F'], ['J', 'P']];
   
   traitPairs.forEach(([trait1, trait2]) => {
-    const score1 = weightedScores[trait1] * normalizedWeight;
-    const score2 = weightedScores[trait2] * normalizedWeight;
-    const total = score1 + score2;
+    const score1 = weightedScores[trait1];
+    const score2 = weightedScores[trait2];
     
-    if (total > 0) {
-      // Calculate exact percentages
-      normalizedScores[trait1] = Math.round((score1 / total) * 100);
-      normalizedScores[trait2] = Math.round((score2 / total) * 100);
-    } else {
-      // Default to 50-50 only if no data exists
-      normalizedScores[trait1] = 50;
-      normalizedScores[trait2] = 50;
-    }
+    // Calculate exact percentages based on weighted proportions
+    normalizedScores[trait1] = Math.round((score1 / weightedScores.totalWeight) * 100);
+    normalizedScores[trait2] = Math.round((score2 / weightedScores.totalWeight) * 100);
   });
+
+  // Calculate test contributions
+  const testContributions = Object.values(latestByCategory).map(r => ({
+    category: r.testCategory,
+    type: r.result.type,
+    effectiveWeight: hasOnly8And24 ? 
+      (r.testCategory === 'mbti-24' ? 75 : 25) :
+      Math.round((this.TEST_WEIGHTS[r.testCategory] / weightedScores.totalWeight) * 100),
+    date: r.createdAt,
+    percentages: r.result.percentages
+  })).sort((a, b) => b.effectiveWeight - a.effectiveWeight);
 
   // Calculate precise trait strengths
   const traitStrengths = {
@@ -142,16 +155,6 @@ testResultSchema.statics.calculateWeightedType = async function(userId) {
     normalizedScores.T > normalizedScores.F ? 'T' : 'F',
     normalizedScores.J > normalizedScores.P ? 'J' : 'P'
   ].join('');
-
-  // Calculate exact test contributions
-  const testContributions = Object.values(latestByCategory).map(r => ({
-    category: r.testCategory,
-    type: r.result.type,
-    baseWeight: this.TEST_WEIGHTS[r.testCategory] * 100, // Show as percentage
-    effectiveWeight: Math.round((this.TEST_WEIGHTS[r.testCategory] / weightedScores.totalWeight) * 100),
-    date: r.createdAt,
-    percentages: r.result.percentages
-  })).sort((a, b) => b.effectiveWeight - a.effectiveWeight);
 
   // Get detailed personality title
   const personalityTitles = {

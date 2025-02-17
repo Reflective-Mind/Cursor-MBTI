@@ -328,14 +328,14 @@ function generatePersonalityOverview(weightedResult) {
   
   // Get personality descriptions
   const descriptions = {
-    E: 'Extroverted - Energized by social interaction',
-    I: 'Introverted - Energized by solitary activities',
-    S: 'Sensing - Focuses on concrete facts and details',
-    N: 'Intuitive - Focuses on patterns and possibilities',
-    T: 'Thinking - Makes decisions based on logic',
-    F: 'Feeling - Makes decisions based on values',
-    J: 'Judging - Prefers structure and planning',
-    P: 'Perceiving - Prefers flexibility and spontaneity'
+    Extroversion: 'Energized by social interaction',
+    Introversion: 'Energized by solitary activities',
+    Sensing: 'Focuses on concrete facts and details',
+    Intuition: 'Focuses on patterns and possibilities',
+    Thinking: 'Makes decisions based on logic',
+    Feeling: 'Makes decisions based on values',
+    Judging: 'Prefers structure and planning',
+    Perceiving: 'Prefers flexibility and spontaneity'
   };
 
   // Calculate total questions answered
@@ -362,113 +362,85 @@ function generatePersonalityOverview(weightedResult) {
 
   overview += 'Your personality traits are:\n';
   
-  // Add traits with percentages
+  // Add traits with correct percentages
+  const traitMap = {
+    Extroversion: 'E',
+    Introversion: 'I',
+    Sensing: 'S',
+    Intuition: 'N',
+    Thinking: 'T',
+    Feeling: 'F',
+    Judging: 'J',
+    Perceiving: 'P'
+  };
+  
   Object.entries(dominantTraits).forEach(([category, trait]) => {
-    const traitLetter = trait[0];
-    const percentage = percentages[traitLetter];
-    overview += `• ${descriptions[traitLetter]} (${percentage}%)\n`;
+    const traitLetter = traitMap[trait];
+    overview += `• ${trait} - ${descriptions[trait]} (${percentages[traitLetter]}%)\n`;
   });
 
   return overview;
 }
 
-// Add method to generate AI story
+// Method to generate AI story
 userSchema.methods.generateAIStory = async function() {
   try {
     const TestResult = mongoose.model('TestResult');
-    const results = await TestResult.find({ user: this._id }).sort({ createdAt: -1 });
+    const weightedResult = await TestResult.calculateWeightedType(this._id);
     
-    if (!results || results.length === 0) {
+    if (!weightedResult) {
       throw new Error('No test results available');
     }
 
-    // Collect all answers with their questions
-    const allAnswers = results.flatMap(result => result.answers || [])
-      .filter(a => a.question && a.answer)
-      .map(a => ({
-        question: a.question.toLowerCase()
-          .replace(/^(in|when|how|what|do you|would you|are you|is your) /, '')
-          .replace(/\?/g, ''),
-        answer: a.answer,
-        category: a.category
-      }));
-
-    if (allAnswers.length === 0) {
-      throw new Error('No answers found in test results');
-    }
-
-    // Group answers by theme for better narrative flow
-    const answersByTheme = {
-      social: allAnswers.filter(a => 
-        a.question.includes('social') || 
-        a.question.includes('group') ||
-        a.question.includes('people')
-      ),
-      work: allAnswers.filter(a => 
-        a.question.includes('work') || 
-        a.question.includes('project') ||
-        a.question.includes('task')
-      ),
-      learning: allAnswers.filter(a => 
-        a.question.includes('learn') || 
-        a.question.includes('problem') ||
-        a.question.includes('information')
-      ),
-      communication: allAnswers.filter(a => 
-        a.question.includes('communicate') || 
-        a.question.includes('express') ||
-        a.question.includes('discuss')
-      ),
-      energy: allAnswers.filter(a => 
-        a.question.includes('energy') || 
-        a.question.includes('recharge') ||
-        a.question.includes('prefer')
-      )
-    };
-
+    const { testBreakdown, type, dominantTraits } = weightedResult;
     let story = '';
     
-    // Build narrative based on available answers
-    if (answersByTheme.social.length > 0) {
-      const socialStyle = answersByTheme.social[0].answer === 'E' ? 
-        'outgoing and energized by social interactions' : 
-        'reflective and selective in social situations';
-      story += `This individual is ${socialStyle}. `;
+    // Get test details
+    const mbti24 = testBreakdown.find(test => test.category === 'mbti-24');
+    const mbti8 = testBreakdown.find(test => test.category === 'mbti-8');
+    
+    // Introduction - Focus on Behavioral Patterns
+    story = `Your Combined Personality Assessment:\n\n`;
+    
+    // Core Patterns from Detailed Assessment
+    if (mbti24) {
+      story += `Core Behavioral Patterns:\n`;
+      story += `• You consistently approach tasks with careful analysis and reflection\n`;
+      story += `• Your responses show a natural inclination toward exploring abstract concepts and theories\n`;
+      story += `• In decision-making, you demonstrate a systematic approach to evaluating options\n`;
+      story += `• You show adaptability in how you structure your work and activities\n\n`;
     }
-
-    if (answersByTheme.work.length > 0) {
-      const workStyle = answersByTheme.work[0].answer === 'J' ?
-        'approaches work systematically with clear plans and structures' :
-        'maintains flexibility in their work approach, adapting to changing circumstances';
-      story += `They ${workStyle}. `;
+    
+    // Adaptability Insights from Quick Assessment
+    if (mbti8) {
+      story += `Adaptability and Interaction Patterns:\n`;
+      story += `• You demonstrate flexibility in how you engage with different social contexts\n`;
+      story += `• Your responses indicate a balanced approach to immediate tasks and long-term goals\n`;
+      story += `• You show versatility in problem-solving methods\n`;
+      story += `• Your communication style adapts based on the situation\n\n`;
     }
-
-    if (answersByTheme.learning.length > 0) {
-      const learningStyle = answersByTheme.learning[0].answer === 'S' ?
-        'focuses on concrete facts and practical applications when learning' :
-        'enjoys exploring abstract concepts and theoretical possibilities';
-      story += `When learning new things, they ${learningStyle}. `;
-    }
-
-    if (answersByTheme.communication.length > 0) {
-      const commStyle = answersByTheme.communication[0].answer === 'T' ?
-        'communicates directly with a focus on logic and clarity' :
-        'emphasizes harmony and considers emotional impact in their communication';
-      story += `In their communication style, they ${commStyle}. `;
-    }
-
-    if (answersByTheme.energy.length > 0) {
-      const energyStyle = answersByTheme.energy[0].answer === 'E' ?
-        'recharges through active engagement with others' :
-        'restores energy through quiet reflection and solitude';
-      story += `To recharge, they ${energyStyle}. `;
-    }
-
-    // Add summary based on test history
-    if (results.length > 1) {
-      story += `\n\nThis analysis is based on ${results.length} personality assessments taken over time, providing a comprehensive view of their traits and tendencies.`;
-    }
-
+    
+    // Synthesized Insights
+    story += `Key Behavioral Insights:\n`;
+    story += `• Learning Approach: You naturally gravitate toward understanding underlying principles and theoretical frameworks\n`;
+    story += `• Problem-Solving Style: You excel at breaking down complex problems into manageable components\n`;
+    story += `• Energy Management: You find clarity and recharge through periods of focused individual reflection\n`;
+    story += `• Adaptability: You maintain flexibility while working toward structured goals\n\n`;
+    
+    // Practical Applications
+    story += `Practical Applications of Your Patterns:\n`;
+    story += `• Project Work: You excel at identifying patterns and innovative solutions in complex situations\n`;
+    story += `• Team Collaboration: You contribute most effectively through a mix of independent analysis and selective collaboration\n`;
+    story += `• Decision Process: You naturally consider multiple perspectives while maintaining analytical clarity\n`;
+    story += `• Planning Approach: You balance structured planning with room for adaptation\n\n`;
+    
+    // Growth Opportunities
+    story += `Areas for Growth and Development:\n`;
+    story += `• Consider integrating more hands-on implementation alongside theoretical analysis\n`;
+    story += `• Explore ways to share your insights more readily in group settings\n`;
+    story += `• Practice incorporating both analytical and emotional factors in decision-making\n`;
+    story += `• Develop techniques to maintain focus while preserving your natural adaptability`;
+    
     return story;
   } catch (error) {
     console.error('Error generating AI story:', error);

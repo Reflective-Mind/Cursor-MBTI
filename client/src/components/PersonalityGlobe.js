@@ -111,7 +111,7 @@ const WorldMap = () => {
       uniforms: {
         time: { value: 0 },
         worldTexture: { 
-          value: new THREE.TextureLoader().load('/world-map-dots.png') 
+          value: new THREE.TextureLoader().load('/images/world-map-dots.svg') 
         }
       },
       vertexShader: `
