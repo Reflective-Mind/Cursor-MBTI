@@ -1,12 +1,12 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { AuthProvider } from './contexts/AuthContext';
-import PrivateRoute from './components/PrivateRoute';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Box } from '@mui/material';
 
 // Components
-import Navbar from './components/Navbar';
+import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import Home from './pages/Home';
 import Assessment from './pages/Assessment';
@@ -15,7 +15,20 @@ import Chat from './pages/Chat';
 import Community from './pages/Community';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
-import Admin from './pages/Admin';
+import AdminPanel from './components/AdminPanel';
+
+// Layout component
+const Layout = ({ children }) => (
+  <Box sx={{ p: 3 }}>
+    {children}
+  </Box>
+);
+
+// PrivateRoute component
+const PrivateRoute = ({ children }) => {
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/login" />;
+};
 
 // Create theme
 const theme = createTheme({
@@ -196,6 +209,24 @@ const theme = createTheme({
   },
 });
 
+// AdminRoute component
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user || !user.roles?.includes('admin')) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
+  if (!user || !user.roles?.includes('admin')) {
+    return null;
+  }
+
+  return children;
+};
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -210,7 +241,7 @@ function App() {
               paddingTop: '64px',
             },
           }}>
-            <Navbar />
+            <Header />
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/assessment" element={<Assessment />} />
@@ -220,11 +251,18 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<Profile />} />
-              <Route path="/admin" element={
-                <PrivateRoute requireAdmin>
-                  <Admin />
-                </PrivateRoute>
-              } />
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute>
+                    <AdminRoute>
+                      <Layout>
+                        <AdminPanel />
+                      </Layout>
+                    </AdminRoute>
+                  </PrivateRoute>
+                }
+              />
             </Routes>
             <BottomNav />
           </div>

@@ -3,7 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Channel = require('../models/Channel');
-const { auth } = require('../middleware/auth');
+const auth = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -30,134 +30,287 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
   fileFilter: (req, file, cb) => {
+    // Check file type
     if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
-      return cb(new Error('Only image files are allowed!'), false);
+      return cb(new Error('Only image files (jpg, jpeg, png, gif) are allowed!'), false);
     }
     cb(null, true);
   }
 });
 
-// Register routes
+// Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, username, mbtiType } = req.body;
+    console.log('Register request received:', {
+      email: req.body.email,
+      username: req.body.username
+    });
 
-    const existingUser = await User.findOne({ 
+    // Check if user already exists
+    const existingUser = await User.findOne({
       $or: [
-        { email: email.toLowerCase() },
-        { username }
+        { email: req.body.email.toLowerCase() },
+        { username: req.body.username }
       ]
     });
 
     if (existingUser) {
-      return res.status(400).json({ 
-        message: existingUser.email === email.toLowerCase() ? 
-          'Email already registered' : 'Username already taken'
+      return res.status(400).json({
+        message: 'User already exists',
+        field: existingUser.email === req.body.email.toLowerCase() ? 'email' : 'username'
       });
     }
 
+    // Create new user
     const user = new User({
-      email: email.toLowerCase(),
-      password,
-      username,
-      mbtiType,
-      roles: ['user']
+      username: req.body.username,
+      email: req.body.email.toLowerCase(),
+      password: req.body.password,
+      roles: req.body.email.toLowerCase() === 'eideken@hotmail.com' ? ['user', 'admin'] : ['user']
     });
 
     await user.save();
+    console.log('User created successfully:', {
+      id: user._id,
+      email: user.email,
+      username: user.username
+    });
 
+    // Add user to all public channels
+    const publicChannels = await Channel.find({ isPrivate: false });
+    for (const channel of publicChannels) {
+      channel.members.push({
+        user: user._id,
+        roles: ['member']
+      });
+      await channel.save();
+    }
+
+    // Generate token
     const token = jwt.sign(
-      { userId: user._id, roles: user.roles },
+      { userId: user._id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
     res.status(201).json({
       token,
-      user: {
-        _id: user._id,
-        email: user.email,
-        username: user.username,
-        avatar: user.avatar,
-        roles: user.roles,
-        mbtiType: user.mbtiType
-      }
+      user: user.getPublicProfile()
     });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: 'Error registering user' });
+    console.error('Register error:', {
+      message: error.message,
+      stack: error.stack,
+      body: {
+        ...req.body,
+        password: '[REDACTED]'
+      },
+      headers: req.headers
+    });
+    res.status(500).json({ 
+      message: 'Error registering user', 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 
+// Login user
 router.post('/login', async (req, res) => {
   try {
+    console.log('Login request received:', {
+      email: req.body.email,
+      headers: {
+        'content-type': req.headers['content-type'],
+        origin: req.headers.origin
+      },
+      timestamp: new Date().toISOString()
+    });
+
     const { email, password } = req.body;
-    
+
+    // Validate input
     if (!email || !password) {
+      console.log('Missing email or password');
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password +roles');
+    // Find user - convert email to lowercase for case-insensitive comparison
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
+      console.log('User not found:', email.toLowerCase());
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    console.log('Found user:', {
+      id: user._id,
+      email: user.email,
+      hasPassword: !!user.password,
+      mbtiType: user.mbtiType,
+      status: user.status,
+      timestamp: new Date().toISOString()
+    });
+
+    // Check password
+    try {
+      const isMatch = await user.comparePassword(password);
+      console.log('Password check result:', {
+        userId: user._id,
+        isMatch: isMatch,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!isMatch) {
+        console.log('Invalid password for user:', email.toLowerCase());
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+    } catch (passwordError) {
+      console.error('Password comparison error:', {
+        userId: user._id,
+        email: user.email,
+        error: {
+          code: passwordError.code,
+          message: passwordError.message,
+          stack: passwordError.stack
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      // Handle specific password comparison errors
+      if (passwordError.code === 'NO_PASSWORD_HASH') {
+        return res.status(500).json({ message: 'Account configuration error' });
+      }
+      if (passwordError.code === 'NO_CANDIDATE_PASSWORD') {
+        return res.status(400).json({ message: 'Password is required' });
+      }
+      
+      // For other errors, send a generic error message
+      return res.status(500).json({ 
+        message: 'Error during authentication',
+        details: process.env.NODE_ENV === 'development' ? passwordError.message : undefined
+      });
     }
 
-    const token = jwt.sign(
-      { userId: user._id, roles: user.roles },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
+    // Update status to online
     user.status = 'online';
     user.lastActive = new Date();
     await user.save();
 
-    res.json({
+    // Generate token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    console.log('Login successful:', {
+      userId: user._id,
+      email: user.email,
+      mbtiType: user.mbtiType,
+      timestamp: new Date().toISOString()
+    });
+
+    // Get profile sections with test breakdown
+    const TestResult = mongoose.model('TestResult');
+    let weightedResult = null;
+    let profileSections = [];
+    
+    try {
+      weightedResult = await TestResult.calculateWeightedType(user._id);
+      console.log('Weighted result calculated:', {
+        userId: user._id,
+        hasResult: !!weightedResult,
+        type: weightedResult?.type,
+        testCount: weightedResult?.testBreakdown?.length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error calculating weighted result:', {
+        userId: user._id,
+        error: {
+          message: error.message,
+          stack: error.stack
+        },
+        timestamp: new Date().toISOString()
+      });
+      // Don't fail login if test results calculation fails
+    }
+
+    try {
+      profileSections = await user.getProfileSections(weightedResult);
+      console.log('Profile sections generated:', {
+        userId: user._id,
+        sectionCount: profileSections?.length,
+        firstSection: profileSections?.[0]?.title,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error generating profile sections:', {
+        userId: user._id,
+        error: {
+          message: error.message,
+          stack: error.stack
+        },
+        timestamp: new Date().toISOString()
+      });
+      // Don't fail login if profile sections generation fails
+      profileSections = [];
+    }
+
+    // Prepare response
+    const response = {
       token,
       user: {
-        _id: user._id,
-        email: user.email,
-        username: user.username,
-        avatar: user.avatar,
-        roles: user.roles,
-        mbtiType: user.mbtiType,
-        status: user.status
+        ...user.getPublicProfile(),
+        sections: profileSections || [],
+        profileSections: profileSections || [],
+        weightedResult: weightedResult || null
       }
-    });
+    };
+
+    res.json(response);
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Error logging in' });
+    console.error('Login error:', {
+      message: error.message,
+      stack: error.stack,
+      body: {
+        ...req.body,
+        password: '[REDACTED]'
+      },
+      timestamp: new Date().toISOString()
+    });
+    res.status(500).json({ 
+      message: 'Error logging in',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
+// Get current user
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+
+    res.json({ user: user.getPublicProfile() });
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ message: 'Error getting user' });
+    res.status(500).json({ message: 'Error getting user data' });
   }
 });
 
+// Update user profile
 router.patch('/me', auth, async (req, res) => {
+  const updates = Object.keys(req.body);
+  const allowedUpdates = ['username', 'email', 'password', 'avatar', 'bio', 'mbtiType', 'status'];
+  const isValidOperation = updates.every(update => allowedUpdates.includes(update));
+
+  if (!isValidOperation) {
+    return res.status(400).json({ message: 'Invalid updates' });
+  }
+
   try {
-    const updates = Object.keys(req.body);
-    const allowedUpdates = ['username', 'email', 'password', 'avatar', 'bio', 'mbtiType', 'status'];
-    const isValidOperation = updates.every(update => allowedUpdates.includes(update));
-
-    if (!isValidOperation) {
-      return res.status(400).json({ message: 'Invalid updates' });
-    }
-
     const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -173,6 +326,7 @@ router.patch('/me', auth, async (req, res) => {
   }
 });
 
+// Logout user
 router.post('/logout', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -189,6 +343,7 @@ router.post('/logout', auth, async (req, res) => {
   }
 });
 
+// Delete account
 router.delete('/me', auth, async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.user.userId);
@@ -203,6 +358,7 @@ router.delete('/me', auth, async (req, res) => {
   }
 });
 
+// Upload avatar
 router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
@@ -214,6 +370,7 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Delete old avatar if it exists and isn't the default
     if (user.avatar && user.avatar !== 'default-avatar.png') {
       const oldAvatarPath = path.join('uploads/avatars', user.avatar);
       if (fs.existsSync(oldAvatarPath)) {
@@ -221,6 +378,7 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
       }
     }
 
+    // Update user avatar
     user.avatar = req.file.filename;
     await user.save();
 
@@ -231,6 +389,7 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
   }
 });
 
+// Get user profile by ID
 router.get('/users/:userId', auth, async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
@@ -242,32 +401,6 @@ router.get('/users/:userId', auth, async (req, res) => {
   } catch (error) {
     console.error('Get user profile error:', error);
     res.status(500).json({ message: 'Error getting user profile' });
-  }
-});
-
-// Debug endpoint to check user roles
-router.get('/debug/me', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId).select('+roles');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    res.json({
-      user: {
-        id: user._id,
-        email: user.email,
-        username: user.username,
-        roles: user.roles,
-        token: {
-          userId: req.user.userId,
-          roles: req.user.roles
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Debug endpoint error:', error);
-    res.status(500).json({ message: 'Error getting user info' });
   }
 });
 

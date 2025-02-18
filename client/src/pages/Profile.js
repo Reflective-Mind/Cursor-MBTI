@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Paper,
@@ -50,10 +50,12 @@ import {
   GitHub as GitHubIcon,
   Language as WebsiteIcon,
   Psychology as PsychologyIcon,
+  PhotoCamera as PhotoCameraIcon,
 } from '@mui/icons-material';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import AvatarWithPreview from '../components/AvatarWithPreview';
 
 const TraitStrengths = ({ data }) => {
   if (!Array.isArray(data)) {
@@ -195,6 +197,8 @@ const Profile = () => {
   });
   const [expandedContent, setExpandedContent] = useState(null);
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const isOwnProfile = !userId || (currentUser && userId === currentUser._id);
 
@@ -545,6 +549,64 @@ const Profile = () => {
     }
   };
 
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a valid image file (JPG, PNG, or GIF)');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image size should be less than 5MB');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload avatar');
+      }
+
+      const data = await response.json();
+      
+      // Update both profile and current user avatar
+      setProfile(prev => ({
+        ...prev,
+        avatar: data.user.avatar
+      }));
+      
+      // Refresh the profile to ensure we have the latest data
+      await fetchProfile();
+      
+      setError(null);
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      setError(error.message || 'Failed to upload avatar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderSectionContent = (item, section) => {
     console.log('Rendering content item:', item);
     const isContentExpanded = expandedContent === item.id;
@@ -657,11 +719,40 @@ const Profile = () => {
         {/* Header Section */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar
-              sx={{ width: 100, height: 100, fontSize: '2.5rem' }}
-            >
-              {profile?.username?.[0]?.toUpperCase()}
-            </Avatar>
+            <Box sx={{ position: 'relative' }}>
+              <AvatarWithPreview
+                src={profile?.avatar ? `${process.env.REACT_APP_API_URL}/uploads/avatars/${profile.avatar}` : undefined}
+                alt={profile?.username}
+                size="large"
+                isGold={profile?.email === 'eideken@hotmail.com'}
+                sx={{ fontSize: '2.5rem' }}
+              >
+                {profile?.username?.[0]?.toUpperCase()}
+              </AvatarWithPreview>
+              {isOwnProfile && (
+                <IconButton
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    },
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <PhotoCameraIcon sx={{ color: 'white' }} />
+                </IconButton>
+              )}
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                accept="image/jpeg,image/png,image/gif"
+                onChange={handleAvatarUpload}
+              />
+            </Box>
             <Box>
               <Typography variant="h4">{profile?.username}</Typography>
               <Chip label={profile?.mbtiType} color="primary" />

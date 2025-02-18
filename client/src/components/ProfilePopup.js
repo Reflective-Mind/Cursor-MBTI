@@ -16,10 +16,12 @@ import {
   ThumbUp as ThumbUpIcon,
   ThumbDown as ThumbDownIcon,
   Person as PersonIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import AvatarWithPreview from './AvatarWithPreview';
 
 const ProfilePopup = ({ userId, open, onClose, username, avatar }) => {
   const navigate = useNavigate();
@@ -28,6 +30,13 @@ const ProfilePopup = ({ userId, open, onClose, username, avatar }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [votingInProgress, setVotingInProgress] = useState(false);
+  const [addChannelDialog, setAddChannelDialog] = useState(false);
+  const [newChannel, setNewChannel] = useState({
+    name: '',
+    description: '',
+    category: 'general',
+    type: 'text'
+  });
 
   useEffect(() => {
     if (open && userId) {
@@ -40,6 +49,18 @@ const ProfilePopup = ({ userId, open, onClose, username, avatar }) => {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setError('No authentication token found');
+        return;
+      }
+
+      console.log('Fetching rating:', {
+        userId,
+        token: token ? 'Present' : 'Missing',
+        url: `${process.env.REACT_APP_API_URL}/api/users/${userId}/rating`
+      });
+      
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/${userId}/rating`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -47,14 +68,18 @@ const ProfilePopup = ({ userId, open, onClose, username, avatar }) => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch rating');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server returned ${response.status}`);
       }
       
       const data = await response.json();
       setRating(data);
     } catch (error) {
-      console.error('Error fetching rating:', error);
-      setError('Failed to load rating');
+      console.error('Error fetching rating:', {
+        message: error.message,
+        stack: error.stack
+      });
+      setError(error.message || 'An error occurred while fetching rating');
     } finally {
       setLoading(false);
     }
@@ -128,18 +153,15 @@ const ProfilePopup = ({ userId, open, onClose, username, avatar }) => {
       </IconButton>
       
       <DialogContent sx={{ p: 3, textAlign: 'center' }}>
-        <Avatar
-          src={avatar}
-          sx={{ 
-            width: 80, 
-            height: 80, 
-            mx: 'auto', 
-            mb: 2,
-            bgcolor: 'primary.main'
-          }}
+        <AvatarWithPreview
+          src={avatar ? `${process.env.REACT_APP_API_URL}/uploads/avatars/${avatar}` : undefined}
+          alt={username}
+          size="medium"
+          isGold={username === 'eideken'}
+          sx={{ mx: 'auto', mb: 2 }}
         >
           {username?.[0]?.toUpperCase()}
-        </Avatar>
+        </AvatarWithPreview>
         
         <Typography variant="h6" gutterBottom>
           {username}
