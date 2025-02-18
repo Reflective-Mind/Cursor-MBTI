@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const TestResult = require('../models/TestResult');
 const User = require('../models/User');
 const mongoose = require('mongoose');
@@ -52,7 +52,7 @@ router.use((req, res, next) => {
 });
 
 // Store test results
-router.post('/', auth, async (req, res) => {
+const storeTestResults = async (req, res) => {
   console.log('POST / handler started');
   try {
     console.log('Received test results request:', {
@@ -80,10 +80,7 @@ router.post('/', auth, async (req, res) => {
 
     const testCategory = testTypeMapping[req.body.testType];
     if (!testCategory) {
-      console.error('Invalid test type:', {
-        receivedType: req.body.testType,
-        allowedTypes: Object.keys(testTypeMapping)
-      });
+      console.error('Invalid test type:', req.body.testType);
       return res.status(400).json({ message: 'Invalid test type' });
     }
 
@@ -224,10 +221,10 @@ router.post('/', auth, async (req, res) => {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+};
 
 // Store test results directly (for testing)
-router.post('/test-results-direct', auth, async (req, res) => {
+const storeTestResultsDirect = async (req, res) => {
   try {
     console.log('Direct test-results route hit:', {
       method: req.method,
@@ -306,16 +303,44 @@ router.post('/test-results-direct', auth, async (req, res) => {
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-});
+};
+
+// Get test results for a user
+const getTestResults = async (req, res) => {
+  try {
+    const results = await TestResult.find({ user: req.user.userId }).sort('-createdAt');
+    res.json(results);
+  } catch (error) {
+    console.error('Error getting test results:', error);
+    res.status(500).json({ message: 'Error getting test results' });
+  }
+};
+
+// Get a specific test result
+const getTestResult = async (req, res) => {
+  try {
+    const result = await TestResult.findOne({
+      _id: req.params.id,
+      user: req.user.userId
+    });
+    if (!result) {
+      return res.status(404).json({ message: 'Test result not found' });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('Error getting test result:', error);
+    res.status(500).json({ message: 'Error getting test result' });
+  }
+};
 
 // Add a test endpoint to verify the router is working
-router.get('/ping', (req, res) => {
+const pingEndpoint = (req, res) => {
   console.log('Ping endpoint accessed');
   res.json({ message: 'Test results router is working' });
-});
+};
 
 // Test endpoint to verify router is working
-router.get('/test', (req, res) => {
+const testEndpoint = (req, res) => {
   console.log('GET /test endpoint accessed');
   res.json({ 
     message: 'Test results router test endpoint is working',
@@ -324,10 +349,10 @@ router.get('/test', (req, res) => {
       methods: layer.route ? Object.keys(layer.route.methods) : undefined
     })).filter(r => r.path)
   });
-});
+};
 
 // Debug endpoint to check test results
-router.get('/debug/results/:userId', auth, async (req, res) => {
+const debugResults = async (req, res) => {
   try {
     console.log('Checking test results for user:', req.params.userId);
     
@@ -359,7 +384,16 @@ router.get('/debug/results/:userId', auth, async (req, res) => {
     console.error('Error checking test results:', error);
     res.status(500).json({ message: 'Error checking test results' });
   }
-});
+};
+
+// Register routes
+router.post('/', auth, (req, res) => storeTestResults(req, res));
+router.post('/test-results-direct', auth, (req, res) => storeTestResultsDirect(req, res));
+router.get('/', auth, (req, res) => getTestResults(req, res));
+router.get('/:id', auth, (req, res) => getTestResult(req, res));
+router.get('/ping', (req, res) => pingEndpoint(req, res));
+router.get('/test', (req, res) => testEndpoint(req, res));
+router.get('/debug/results/:userId', auth, (req, res) => debugResults(req, res));
 
 // Log that the router is ready
 console.log('Test results router initialized with routes:', {

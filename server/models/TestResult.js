@@ -1,5 +1,33 @@
+/**
+ * Test Result Model
+ * ================
+ * 
+ * Manages MBTI personality test results and analysis.
+ * Implements a sophisticated weighted scoring system for multiple test types.
+ * 
+ * Test Categories:
+ * - MBTI-8: Quick assessment (8 questions, 6% weight)
+ * - MBTI-24: Standard assessment (24 questions, 18% weight)
+ * - MBTI-100: Comprehensive assessment (100 questions, 76% weight)
+ * 
+ * Key Features:
+ * - Stores individual test results
+ * - Calculates weighted personality types
+ * - Tracks answer history
+ * - Provides detailed trait analysis
+ * 
+ * Weight System:
+ * The model uses a weighted scoring system that prioritizes more comprehensive tests
+ * while still considering quick assessments for a balanced analysis.
+ */
+
 const mongoose = require('mongoose');
 
+/**
+ * Test Result Schema
+ * -----------------
+ * Core schema for storing and analyzing MBTI test results
+ */
 const testResultSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -17,26 +45,26 @@ const testResultSchema = new mongoose.Schema({
       required: true
     },
     percentages: {
-      E: Number,
-      I: Number,
-      S: Number,
-      N: Number,
-      T: Number,
-      F: Number,
-      J: Number,
-      P: Number
+      E: Number,  // Extraversion
+      I: Number,  // Introversion
+      S: Number,  // Sensing
+      N: Number,  // Intuition
+      T: Number,  // Thinking
+      F: Number,  // Feeling
+      J: Number,  // Judging
+      P: Number   // Perceiving
     },
     dominantTraits: {
-      attitude: String,
-      perception: String,
-      judgment: String,
-      lifestyle: String
+      attitude: String,    // E/I preference
+      perception: String,  // S/N preference
+      judgment: String,    // T/F preference
+      lifestyle: String    // J/P preference
     },
     traitStrengths: {
-      EI: Number,
-      SN: Number,
-      TF: Number,
-      JP: Number
+      EI: Number,  // Extraversion-Introversion strength
+      SN: Number,  // Sensing-Intuition strength
+      TF: Number,  // Thinking-Feeling strength
+      JP: Number   // Judging-Perceiving strength
     }
   },
   answers: [{

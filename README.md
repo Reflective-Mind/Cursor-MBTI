@@ -1,102 +1,129 @@
-# MBTI Insights
-
-A comprehensive application for understanding and leveraging MBTI personality types through personalized insights, recommendations, and community interaction.
-
-## Features
-
-- 🎯 Personality Assessment
-- 💡 Personalized Insights
-- 🤝 Custom Advice
-- 💬 Interactive Chat
-- ✍️ Content Generation
-- ❤️ Compatibility Checker
-- 🎯 Goal Setting
-- 📊 Mood Tracker
-- 👥 Community Forum
-- 📚 Educational Resources
-
-## Tech Stack
-
-- **Frontend**: React
-- **Backend**: Node.js, Express
-- **Database**: MongoDB
-- **API**: Le Chat API Integration
-- **Authentication**: JWT
-- **Testing**: Jest
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-- MongoDB
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/mbti-insights.git
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm run install:all
-   ```
-
-3. Create a `.env` file in the root directory:
-   ```
-   PORT=5000
-   MONGODB_URI=your_mongodb_uri
-   JWT_SECRET=your_jwt_secret
-   LECHAT_API_KEY=your_api_key
-   ```
-
-4. Start the development servers:
-   ```bash
-   npm run dev
-   ```
+# MBTI Insights Project
+=====================
 
 ## Project Structure
-
 ```
-mbti-insights/
-├── client/                 # React frontend
-├── server/                 # Node.js backend
-│   ├── config/            # Configuration files
-│   ├── controllers/       # Route controllers
-│   ├── middleware/        # Custom middleware
-│   ├── models/           # Database models
-│   ├── routes/           # API routes
-│   └── utils/            # Utility functions
-├── tests/                 # Test files
-└── package.json
+project_root/
+├── docs/                          # Project documentation
+│   ├── ENVIRONMENT_STRUCTURE.md   # Environment setup guide
+│   └── CONTRIBUTING.md           # Contribution guidelines
+├── server/                        # Backend server
+│   ├── docs/                     # Server documentation
+│   ├── src/                      # Source code
+│   ├── test/                     # Test files
+│   ├── scripts/                  # Utility scripts
+│   └── config/                   # Configuration files
+└── client/                        # Frontend client
+    ├── docs/                     # Client documentation
+    ├── src/                      # React source code
+    ├── public/                   # Static files
+    └── config/                   # Client configuration
 ```
 
-## API Documentation
+## Environment Configuration
 
-The application uses the Le Chat API for natural language processing and content generation. Key endpoints:
+### Server Environment Files
+- `server/.env`: Main server configuration
+- `server/.env.example`: Template for setup
+- `server/test/.env.test`: Test configuration
 
-- `/api/auth`: Authentication endpoints
-- `/api/personality`: MBTI assessment and results
-- `/api/insights`: Personalized insights and recommendations
-- `/api/chat`: Interactive chat functionality
-- `/api/community`: Community forum endpoints
+### Client Environment Files
+- `client/.env.development`: Development settings
+- `client/.env.production`: Production settings
+
+## Documentation Structure
+
+### Project Documentation
+- `docs/`: Project-level documentation
+- `server/docs/`: Server-specific docs
+- `client/docs/`: Client-specific docs
+
+### Code Documentation
+- Component documentation in code
+- API documentation in server
+- Test documentation in test files
+
+## Development Setup
+
+1. Clone repository
+2. Copy environment files:
+   ```bash
+   cp server/.env.example server/.env
+   cp client/.env.development.example client/.env.development
+   ```
+3. Install dependencies:
+   ```bash
+   # Server
+   cd server && npm install
+   
+   # Client
+   cd client && npm install
+   ```
+4. Start development servers:
+   ```bash
+   # Server
+   cd server && npm run dev
+   
+   # Client
+   cd client && npm start
+   ```
+
+## Configuration Validation
+
+Run the validation script:
+```bash
+cd server && npm run validate-config
+```
+
+This will:
+1. Verify environment files
+2. Check configuration values
+3. Validate cross-component compatibility
+4. Test database connection
+
+## Project Organization
+
+The project follows a strict organization:
+1. No duplicate files
+2. Clear separation of concerns
+3. Proper documentation
+4. Regular validation
+
+### File Locations
+- Configuration files in respective directories
+- Documentation in docs folders
+- Source code in src directories
+- Tests in test directories
+
+### Maintenance Rules
+1. Keep documentation updated
+2. Remove duplications
+3. Validate configurations
+4. Follow structure guidelines
+
+## Security
+
+- No credentials in version control
+- Use environment variables
+- Follow security guidelines
+- Regular security audits
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+See `CONTRIBUTING.md` for:
+- Code standards
+- Pull request process
+- Documentation requirements
+- Testing guidelines
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - See LICENSE file
 
-## Acknowledgments
+## Support
 
-- MBTI Foundation for personality type information
-- Le Chat API for natural language processing capabilities
-- The open-source community for various tools and libraries used in this project 
+For issues:
+1. Check documentation
+2. Search existing issues
+3. Create detailed bug report
+4. Follow templates 

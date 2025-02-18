@@ -14,7 +14,14 @@
     "install-client": "cd client && npm install",
     "build-client": "cd client && npm run build",
     "postinstall": "npm run install-server",
-    "deploy": "git add . && git commit -m \"Deploy updates\" && git push origin master"
+    "deploy": "git add . && git commit -m \"Deploy updates\" && git push origin master",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "validate-config": "node server/scripts/validate-config.js",
+    "verify-env": "node server/scripts/verify-env.js",
+    "enforce-structure": "node server/scripts/enforce-structure.js",
+    "prevent-mistakes": "node server/scripts/prevent-mistakes.js",
+    "prestart": "npm run validate-config && npm run verify-env && npm run prevent-mistakes",
+    "test": "cd server && npm test && cd ../client && npm test"
   },
   "dependencies": {
     "axios": "^1.6.7",
@@ -31,6 +38,7 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^2.0.22",
+    "concurrently": "^8.2.2"
   }
 }

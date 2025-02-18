@@ -24,6 +24,12 @@ import {
   useTheme,
   useMediaQuery,
   Chip,
+  Button,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -37,34 +43,42 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Close as CloseIcon,
+  Add as AddIcon,
+  Clear as ClearIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react';
+import ProfilePopup from '../components/ProfilePopup';
+import { useAuth } from '../contexts/AuthContext';
+import ChannelList from '../components/ChannelList';
 
 const Community = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [socket, setSocket] = useState(null);
   const [channels, setChannels] = useState([]);
   const [currentChannel, setCurrentChannel] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [channelMessages, setChannelMessages] = useState(() => {
-    const savedMessages = localStorage.getItem('channelMessages');
-    return savedMessages ? JSON.parse(savedMessages) : {};
-  });
-  const [message, setMessage] = useState('');
+  const [channelMessages, setChannelMessages] = useState({});
+  const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [editingMessage, setEditingMessage] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [selectedMessage, setSelectedMessage] = useState(null);
-  const [showUserList, setShowUserList] = useState(!isMobile);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedEmoji, setSelectedEmoji] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const chatContainerRef = useRef(null);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   // Add authentication check
   useEffect(() => {
@@ -88,7 +102,7 @@ const Community = () => {
     console.log('Selecting channel:', channel);
     setCurrentChannel(channel);
     setError(null);
-    setMessage(''); // Reset message input when changing channels
+    setNewMessage(''); // Reset message input when changing channels
     
     // Load cached messages if they exist
     if (channelMessages[channel._id]) {
@@ -230,8 +244,14 @@ const Community = () => {
       });
       
       if (currentChannel) {
-        // Filter out deleted messages and store in state
-        const filteredMessages = channelMessages.filter(msg => !msg.deleted);
+        // Filter out deleted messages and ensure roles are preserved
+        const filteredMessages = channelMessages.filter(msg => !msg.deleted).map(msg => ({
+          ...msg,
+          author: {
+            ...msg.author,
+            roles: msg.author.roles || []
+          }
+        }));
         setChannelMessages(prev => ({
           ...prev,
           [currentChannel._id]: filteredMessages
@@ -252,7 +272,15 @@ const Community = () => {
       if (newMessage.channel.toString() === currentChannel?._id.toString()) {
         setMessages(prev => {
           const filtered = prev.filter(msg => !msg.temporary);
-          const updated = [...filtered, newMessage];
+          // Ensure roles are preserved in new message
+          const messageWithRoles = {
+            ...newMessage,
+            author: {
+              ...newMessage.author,
+              roles: newMessage.author.roles || []
+            }
+          };
+          const updated = [...filtered, messageWithRoles];
           // Update channel messages cache
           setChannelMessages(prevChannelMessages => {
             const updatedCache = {
@@ -396,9 +424,9 @@ const Community = () => {
   const handleSendMessage = (e) => {
     e?.preventDefault();
     
-    if (!message.trim() || !currentChannel || !socket || !socket.user) {
+    if (!newMessage.trim() || !currentChannel || !socket || !socket.user) {
       console.error('Cannot send message: missing required data', {
-        hasMessage: Boolean(message.trim()),
+        hasMessage: Boolean(newMessage.trim()),
         hasChannel: Boolean(currentChannel),
         hasSocket: Boolean(socket),
         hasUser: Boolean(socket?.user)
@@ -406,7 +434,7 @@ const Community = () => {
       return;
     }
 
-    const messageContent = message.trim();
+    const messageContent = newMessage.trim();
     console.log('Sending message:', {
       channelId: currentChannel._id,
       content: messageContent
@@ -462,7 +490,7 @@ const Community = () => {
       });
     }
 
-    setMessage('');
+    setNewMessage('');
     setShowEmojiPicker(false);
     scrollToBottom();
   };
@@ -476,22 +504,148 @@ const Community = () => {
 
   const handleEditMessage = (message) => {
     setEditingMessage(message);
-    setMessage(message.content);
-    setMenuAnchor(null);
+    setNewMessage(message.content);
+    setAnchorEl(null);
   };
 
-  const handleDeleteMessage = (message) => {
-    if (!socket || !message) return;
-    
-    // Emit the delete event first
-    socket.emit('message:delete', message._id);
-    
-    // Update UI
-    setMessages(prev => prev.filter(msg => msg._id !== message._id));
-    setChannelMessages(prev => ({
-      ...prev,
-      [currentChannel._id]: prev[currentChannel._id].filter(msg => msg._id !== message._id)
-    }));
+  const handleDeleteMessage = async (messageId) => {
+    if (!currentChannel || !messageId) {
+      console.error('No channel selected or invalid message ID');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/community/channels/${currentChannel._id}/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete message');
+      }
+
+      // Update UI
+      setMessages(prev => prev.filter(m => m._id !== messageId));
+      setChannelMessages(prev => ({
+        ...prev,
+        [currentChannel._id]: prev[currentChannel._id].filter(m => m._id !== messageId)
+      }));
+
+      // Emit socket event
+      if (socket) {
+        socket.emit('message:delete', {
+          channelId: currentChannel._id,
+          messageId
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      setError(error.message || 'Failed to delete message');
+    }
+  };
+
+  const handleDeleteChannel = async (channelId) => {
+    try {
+      if (!user?.roles?.includes('admin')) {
+        setError('Only admins can delete channels');
+        return;
+      }
+
+      if (!window.confirm('Are you sure you want to delete this channel?')) {
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/community/channels/${channelId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to delete channel');
+      }
+
+      // Update channels list
+      setChannels(prevChannels => prevChannels.filter(c => c._id !== channelId));
+
+      // If deleting current channel, switch to another one
+      if (currentChannel?._id === channelId) {
+        const remainingChannels = channels.filter(c => c._id !== channelId);
+        if (remainingChannels.length > 0) {
+          handleChannelSelect(remainingChannels[0]);
+        } else {
+          setCurrentChannel(null);
+          setMessages([]);
+        }
+      }
+
+      // Clear channel messages from cache
+      setChannelMessages(prev => {
+        const updated = { ...prev };
+        delete updated[channelId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error deleting channel:', error);
+      setError(error.message || 'Failed to delete channel');
+    }
+  };
+
+  const handleClearChannel = async () => {
+    try {
+      if (!user?.roles?.includes('admin')) {
+        setError('Only admins can clear channels');
+        return;
+      }
+
+      if (!currentChannel) {
+        setError('No channel selected');
+        return;
+      }
+
+      if (!window.confirm('Are you sure you want to clear all messages in this channel?')) {
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/community/channels/${currentChannel._id}/clear`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to clear channel');
+      }
+
+      // Clear messages in the current channel
+      setMessages([]);
+      
+      // Update channel messages cache
+      setChannelMessages(prev => ({
+        ...prev,
+        [currentChannel._id]: []
+      }));
+
+      // Emit socket event for real-time updates
+      if (socket) {
+        socket.emit('channel:clear', {
+          channelId: currentChannel._id
+        });
+      }
+    } catch (error) {
+      console.error('Error clearing channel:', error);
+      setError(error.message || 'Failed to clear channel');
+    }
   };
 
   const handleReaction = (messageId, emoji) => {
@@ -499,7 +653,7 @@ const Community = () => {
     
     // If emoji is not provided (clicking reaction button), show emoji picker
     if (!emoji) {
-      setSelectedMessage({ _id: messageId });
+      setSelectedEmoji({ _id: messageId });
       setShowEmojiPicker(true);
       return;
     }
@@ -552,11 +706,11 @@ const Community = () => {
   };
 
   const handleEmojiSelect = (emojiData) => {
-    if (selectedMessage) {
-      handleReaction(selectedMessage._id, emojiData.emoji);
-      setSelectedMessage(null);
+    if (selectedEmoji) {
+      handleReaction(selectedEmoji._id, emojiData.emoji);
+      setSelectedEmoji(null);
     } else {
-      setMessage(prev => prev + emojiData.emoji);
+      setNewMessage(prev => prev + emojiData.emoji);
     }
     setShowEmojiPicker(false);
   };
@@ -573,23 +727,112 @@ const Community = () => {
     });
   };
 
-  const handleProfileClick = (userId) => {
+  const handleProfileClick = (userId, username, avatar) => {
     // Check if userId exists and is valid
     if (!userId) return;
     
-    // Navigate to the profile page with the userId
-    navigate(`/profile/${userId}`);
+    // Open profile popup instead of navigating
+    setSelectedProfile({
+      userId,
+      username,
+      avatar
+    });
+  };
+
+  const getChannelEmoji = (channelName) => {
+    const name = channelName.toLowerCase();
+    if (name.includes('general')) return '💬';
+    if (name.includes('introvert') || name.includes('intj') || name.includes('intp')) return '🤔';
+    if (name.includes('extrovert') || name.includes('entj') || name.includes('entp')) return '🗣️';
+    if (name.includes('feeling') || name.includes('infj') || name.includes('infp')) return '❤️';
+    if (name.includes('thinking') || name.includes('istj') || name.includes('istp')) return '🧠';
+    if (name.includes('sensing') || name.includes('esfj') || name.includes('esfp')) return '👀';
+    if (name.includes('intuition') || name.includes('enfj') || name.includes('enfp')) return '✨';
+    if (name.includes('judging')) return '📋';
+    if (name.includes('perceiving')) return '🔍';
+    if (name.includes('announcement')) return '📢';
+    if (name.includes('help')) return '❓';
+    if (name.includes('off-topic')) return '💭';
+    return '🌟';
+  };
+
+  const handleCreateChannel = async () => {
+    if (!user?.roles?.includes('admin')) {
+      setError('Only admins can create channels');
+      return;
+    }
+    
+    const channelName = prompt('Enter channel name:');
+    if (!channelName?.trim()) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Creating channel:', { channelName });
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/community/channels`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: channelName.trim(),
+          description: `Channel for ${channelName.trim()}`
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create channel');
+      }
+
+      // Update channels list with new channel
+      setChannels(prevChannels => [...prevChannels, data]);
+      
+      // Initialize empty message cache for new channel
+      setChannelMessages(prev => ({
+        ...prev,
+        [data._id]: []
+      }));
+      
+      // Switch to the new channel
+      handleChannelSelect(data);
+      
+    } catch (error) {
+      console.error('Error creating channel:', error);
+      setError(error.message || 'Failed to create channel');
+    }
+  };
+
+  const handleMenuOpen = (event, msg) => {
+    setMenuAnchor(event.currentTarget);
+    setSelectedMessage(msg);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setSelectedMessage(null);
   };
 
   return (
-    <Container maxWidth="xl" sx={{ height: 'calc(100vh - 64px)', pt: 2 }}>
+    <Container maxWidth="xl" sx={{ mt: 4, height: 'calc(100vh - 120px)' }}>
       <Grid container spacing={2} sx={{ height: '100%' }}>
-        {/* Channels Sidebar */}
-        <Grid item xs={12} md={2}>
+        <Grid item xs={12} md={3}>
+          {/* Channel list */}
           <Paper sx={{ height: '100%', overflow: 'auto' }}>
             <List>
               <ListItem>
                 <Typography variant="h6">Channels</Typography>
+                {user.roles?.includes('admin') && (
+                  <IconButton
+                    color="primary"
+                    onClick={handleCreateChannel}
+                    sx={{ ml: 'auto' }}
+                  >
+                    <AddIcon />
+                  </IconButton>
+                )}
               </ListItem>
               <Divider />
               {channels.map((channel) => (
@@ -599,186 +842,125 @@ const Community = () => {
                   onClick={() => handleChannelSelect(channel)}
                 >
                   <ListItemIcon>
-                    <TagIcon />
+                    {getChannelEmoji(channel.name)}
                   </ListItemIcon>
                   <ListItemText primary={channel.name} />
+                  {user.roles?.includes('admin') && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChannel(channel._id);
+                      }}
+                      sx={{ color: 'error.main' }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  )}
                 </ListItemButton>
               ))}
             </List>
           </Paper>
         </Grid>
-
-        {/* Main Chat Area */}
-        <Grid item xs={12} md={showUserList ? 7 : 10}>
+        <Grid item xs={12} md={9}>
           <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Channel Header */}
-            {currentChannel && (
-              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="h6">
-                  # {currentChannel.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {currentChannel.description}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Messages Area */}
-            <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-              {isLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <List>
-                  {messages.map((msg, index) => (
-                    <ListItem
-                      key={msg._id}
-                      sx={{
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                          '& .message-actions': {
-                            display: 'flex',
-                          },
-                        },
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Badge
-                          overlap="circular"
-                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                          variant="dot"
-                          color={msg.author.status === 'online' ? 'success' : 'error'}
-                        >
-                          <Avatar 
-                            src={msg.author.avatar}
-                            onClick={() => handleProfileClick(msg.author._id)}
-                            sx={{ cursor: 'pointer' }}
-                          >
-                            {msg.author.username[0]}
-                          </Avatar>
-                        </Badge>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle2">
-                              {msg.author.username}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {formatTimestamp(msg.createdAt)}
-                            </Typography>
-                            {msg.edited && (
-                              <Typography variant="caption" color="text.secondary">
-                                (edited)
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                        secondary={
-                          <Box>
-                            <Typography
-                              variant="body1"
-                              color={msg.deleted ? 'text.disabled' : 'text.primary'}
-                              sx={{ 
-                                fontStyle: msg.deleted ? 'italic' : 'normal',
-                                position: 'relative',
-                                '&:hover': {
-                                  '& .edit-hint': {
-                                    opacity: 1
-                                  }
-                                }
-                              }}
-                            >
-                              {msg.deleted ? 'This message was deleted' : msg.content}
-                              {msg.author._id === socket?.user?._id && !msg.deleted && (
-                                <Typography
-                                  component="span"
-                                  variant="caption"
-                                  color="text.secondary"
-                                  className="edit-hint"
-                                  sx={{
-                                    ml: 1,
-                                    opacity: 0,
-                                    transition: 'opacity 0.2s',
-                                    cursor: 'pointer'
-                                  }}
-                                  onClick={() => handleEditMessage(msg)}
-                                >
-                                  (click to edit)
-                                </Typography>
-                              )}
-                            </Typography>
-                            {msg.reactions && msg.reactions.length > 0 && (
-                              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                                {msg.reactions.map((reaction, i) => {
-                                  // Find the usernames for this reaction
-                                  const usernames = users
-                                    .filter(user => reaction.users.includes(user._id))
-                                    .map(user => user.username)
-                                    .join(', ');
-                                  
-                                  return (
-                                    <Tooltip 
-                                      key={i}
-                                      title={usernames || 'No users'}
-                                      arrow
-                                      placement="top"
-                                    >
-                                      <Chip
-                                        label={`${reaction.emoji} ${reaction.users.length}`}
-                                        size="small"
-                                        onClick={() => handleReaction(msg._id, reaction.emoji)}
-                                        sx={{ cursor: 'pointer' }}
-                                      />
-                                    </Tooltip>
-                                  );
-                                })}
-                              </Box>
-                            )}
-                          </Box>
-                        }
-                      />
-                      <Box
-                        className="message-actions"
-                        sx={{
-                          display: 'none',
-                          position: 'absolute',
-                          right: 16,
-                          top: 8,
-                          bgcolor: 'background.paper',
-                          borderRadius: 1,
-                          boxShadow: 2,
-                        }}
-                      >
-                        <Tooltip title="Add Reaction">
-                          <IconButton size="small" onClick={() => handleReaction(msg._id)}>
-                            <EmojiIcon />
-                          </IconButton>
-                        </Tooltip>
-                        {msg.author._id === socket?.user?._id && (
-                          <>
-                            <Tooltip title="Edit">
-                              <IconButton size="small" onClick={() => handleEditMessage(msg)}>
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete">
-                              <IconButton size="small" onClick={() => handleDeleteMessage(msg)}>
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                      </Box>
-                    </ListItem>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </List>
+            {/* Channel header */}
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">
+                {currentChannel?.name}
+              </Typography>
+              {user.roles?.includes('admin') && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={handleClearChannel}
+                >
+                  Clear Channel
+                </Button>
               )}
             </Box>
-
-            {/* Message Input */}
+            
+            {/* Messages container */}
+            <Box
+              ref={chatContainerRef}
+              sx={{
+                flex: 1,
+                overflow: 'auto',
+                p: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2
+              }}
+            >
+              {messages.map((message) => (
+                <Box
+                  key={message._id}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 1,
+                    '&:hover .message-actions': {
+                      opacity: 1
+                    }
+                  }}
+                >
+                  <Avatar
+                    src={message.author.avatar}
+                    alt={message.author.username}
+                    onClick={() => handleProfileClick(message.author._id, message.author.username, message.author.avatar)}
+                    sx={{ 
+                      width: 40, 
+                      height: 40, 
+                      cursor: 'pointer',
+                      ...(message.author.roles?.includes('admin') && {
+                        border: '2px solid #FFD700',
+                        boxShadow: '0 0 10px #FFD700'
+                      })
+                    }}
+                  />
+                  <Box sx={{ flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          fontWeight: 'bold',
+                          color: message.author.roles?.includes('admin') ? '#FFD700' : 'inherit'
+                        }}
+                      >
+                        {message.author.username}
+                        {message.author.roles?.includes('admin') && ' (Admin)'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatTimestamp(message.createdAt)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1">{message.content}</Typography>
+                  </Box>
+                  {(message.author._id === socket?.user?._id || user?.roles?.includes('admin')) && (
+                    <Box 
+                      className="message-actions" 
+                      sx={{ 
+                        opacity: 0, 
+                        transition: 'opacity 0.2s',
+                        display: 'flex',
+                        gap: 1
+                      }}
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDeleteMessage(message._id)}
+                        sx={{ color: 'error.main' }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
+              ))}
+              <div ref={messagesEndRef} />
+            </Box>
+            
+            {/* Message input */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
               <form onSubmit={handleSendMessage}>
                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -799,8 +981,8 @@ const Community = () => {
                     fullWidth
                     multiline
                     maxRows={4}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder={`Message ${currentChannel ? `#${currentChannel.name}` : ''}`}
                     variant="outlined"
@@ -816,7 +998,7 @@ const Community = () => {
                   <IconButton
                     type="submit"
                     color="primary"
-                    disabled={!message.trim() || !currentChannel}
+                    disabled={!newMessage.trim() || !currentChannel}
                   >
                     <SendIcon />
                   </IconButton>
@@ -853,69 +1035,35 @@ const Community = () => {
             </Box>
           </Paper>
         </Grid>
-
-        {/* Users Sidebar */}
-        {(showUserList || !isMobile) && (
-          <Grid item xs={12} md={3}>
-            <Paper sx={{ height: '100%', overflow: 'auto' }}>
-              <List>
-                <ListItem>
-                  <Typography variant="h6">Online Users</Typography>
-                  {isMobile && (
-                    <IconButton
-                      sx={{ ml: 'auto' }}
-                      onClick={() => setShowUserList(false)}
-                    >
-                      <CloseIcon />
-                    </IconButton>
-                  )}
-                </ListItem>
-                <Divider />
-                {users
-                  .sort((a, b) => (a.status === 'online' ? -1 : 1))
-                  .map((user) => (
-                    <ListItem key={user._id}>
-                      <ListItemAvatar>
-                        <Badge
-                          overlap="circular"
-                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                          variant="dot"
-                          color={user.status === 'online' ? 'success' : 'error'}
-                        >
-                          <Avatar 
-                            src={user.avatar}
-                            onClick={() => handleProfileClick(user._id)}
-                            sx={{ cursor: 'pointer' }}
-                          >
-                            {user.username[0]}
-                          </Avatar>
-                        </Badge>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={user.username}
-                        secondary={user.mbtiType}
-                      />
-                    </ListItem>
-                  ))}
-              </List>
-            </Paper>
-          </Grid>
-        )}
       </Grid>
 
       {/* Context Menu */}
       <Menu
         anchorEl={menuAnchor}
         open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
+        onClose={handleMenuClose}
       >
-        <MenuItem onClick={() => handleDeleteMessage(selectedMessage)}>
+        <MenuItem onClick={() => {
+          if (selectedMessage) {
+            handleDeleteMessage(selectedMessage._id);
+            handleMenuClose();
+          }
+        }}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Delete Message</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Add ProfilePopup */}
+      <ProfilePopup
+        userId={selectedProfile?.userId}
+        username={selectedProfile?.username}
+        avatar={selectedProfile?.avatar}
+        open={!!selectedProfile}
+        onClose={() => setSelectedProfile(null)}
+      />
     </Container>
   );
 };

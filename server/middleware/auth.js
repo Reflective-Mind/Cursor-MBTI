@@ -32,8 +32,8 @@ const auth = async (req, res, next) => {
       userId: decoded.userId
     });
 
-    // Find user
-    const user = await User.findById(decoded.userId);
+    // Find user with roles
+    const user = await User.findById(decoded.userId).select('+roles');
     
     if (!user) {
       console.log('User not found:', {
@@ -49,11 +49,15 @@ const auth = async (req, res, next) => {
     await user.save();
 
     // Add user info to request
-    req.user = decoded;
+    req.user = {
+      userId: decoded.userId,
+      roles: user.roles || []
+    };
     req.token = token;
 
     console.log('Auth middleware completed successfully:', {
       userId: decoded.userId,
+      roles: user.roles,
       path: req.path,
       method: req.method
     });
@@ -82,4 +86,24 @@ const auth = async (req, res, next) => {
   }
 };
 
-module.exports = auth; 
+const isAdmin = async (req, res, next) => {
+  try {
+    if (!req.user.roles?.includes('admin')) {
+      console.log('Admin access denied:', {
+        userId: req.user.userId,
+        roles: req.user.roles,
+        path: req.path
+      });
+      return res.status(403).json({ message: 'Access denied: Admin privileges required' });
+    }
+    next();
+  } catch (error) {
+    console.error('Error checking admin status:', error);
+    res.status(500).json({ message: 'Error checking admin status' });
+  }
+};
+
+module.exports = {
+  auth,
+  isAdmin
+}; 

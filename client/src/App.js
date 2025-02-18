@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AuthProvider } from './contexts/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
 
 // Components
 import Navbar from './components/Navbar';
@@ -14,6 +15,7 @@ import Chat from './pages/Chat';
 import Community from './pages/Community';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
+import Admin from './pages/Admin';
 
 // Create theme
 const theme = createTheme({
@@ -218,6 +220,11 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile/:userId" element={<Profile />} />
+              <Route path="/admin" element={
+                <PrivateRoute requireAdmin>
+                  <Admin />
+                </PrivateRoute>
+              } />
             </Routes>
             <BottomNav />
           </div>

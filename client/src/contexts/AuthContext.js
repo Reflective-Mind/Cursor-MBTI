@@ -205,7 +205,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     register,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    token: localStorage.getItem('token')
   };
 
   return (

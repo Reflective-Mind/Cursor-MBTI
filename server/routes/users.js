@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth, isAdmin } = require('../middleware/auth');
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const TestResult = require('../models/TestResult');
@@ -752,6 +752,306 @@ router.get('/debug', auth, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Get sorted users (admin only)
+router.get('/sorted', auth, isAdmin, async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('username avatar roles status lastActive positivePercentage totalVotes badges')
+      .lean();
+
+    console.log('Fetched users for admin dashboard:', {
+      count: users.length,
+      fields: Object.keys(users[0] || {})
+    });
+
+    res.json(users);
+  } catch (error) {
+    console.error('Error getting sorted users:', error);
+    res.status(500).json({ message: 'Error getting users' });
+  }
+});
+
+// Make user an admin
+router.post('/make-admin', auth, isAdmin, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.roles.includes('admin')) {
+      return res.status(400).json({ message: 'User is already an admin' });
+    }
+
+    user.roles.push('admin');
+    await user.save();
+
+    res.json({ 
+      message: 'User successfully made admin',
+      user: user.getPublicProfile()
+    });
+  } catch (error) {
+    console.error('Make admin error:', error);
+    res.status(500).json({ message: 'Error making user admin' });
+  }
+});
+
+// Admin dashboard route
+router.get('/admin/list', auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const user = await User.findById(req.user.userId).select('roles');
+    if (!user?.roles?.includes('admin')) {
+      return res.status(403).json({ message: 'Only admins can access this route' });
+    }
+
+    const users = await User.find({})
+      .select('username email avatar roles status lastActive mbtiType badges')
+      .lean();
+
+    // Add rating information for each user
+    const usersWithRatings = await Promise.all(users.map(async (user) => {
+      const totalVotes = (user.upvotes || 0) + (user.downvotes || 0);
+      const positivePercentage = totalVotes > 0 
+        ? Math.round((user.upvotes || 0) * 100 / totalVotes) 
+        : 0;
+
+      return {
+        ...user,
+        totalVotes,
+        positivePercentage,
+        badges: user.badges || []
+      };
+    }));
+
+    res.json({ users: usersWithRatings });
+  } catch (error) {
+    console.error('Error getting admin user list:', error);
+    res.status(500).json({ message: 'Error getting user list' });
+  }
+});
+
+// Delete user (admin only)
+router.delete('/admin/:userId', auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.userId).select('roles');
+    if (!adminUser?.roles?.includes('admin')) {
+      return res.status(403).json({ message: 'Only admins can delete users' });
+    }
+
+    const userToDelete = await User.findById(req.params.userId);
+    if (!userToDelete) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Delete user's test results
+    await TestResult.deleteMany({ user: userToDelete._id });
+
+    // Delete the user
+    await User.deleteOne({ _id: userToDelete._id });
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Error deleting user' });
+  }
+});
+
+// Reset user ratings (admin only)
+router.post('/admin/:userId/reset-ratings', auth, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminUser = await User.findById(req.user.userId).select('roles');
+    if (!adminUser?.roles?.includes('admin')) {
+      return res.status(403).json({ message: 'Only admins can reset ratings' });
+    }
+
+    const userToReset = await User.findById(req.params.userId);
+    if (!userToReset) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Reset ratings
+    userToReset.upvotes = 0;
+    userToReset.downvotes = 0;
+    await userToReset.save();
+
+    res.json({ message: 'User ratings reset successfully' });
+  } catch (error) {
+    console.error('Error resetting user ratings:', error);
+    res.status(500).json({ message: 'Error resetting user ratings' });
+  }
+});
+
+// Enhanced rate user endpoint
+router.post('/:userId/rate', auth, async (req, res) => {
+  try {
+    console.log('Rate user request:', {
+      targetUserId: req.params.userId,
+      voterId: req.user.userId,
+      vote: req.body.vote
+    });
+
+    // Prevent self-voting
+    if (req.params.userId === req.user.userId) {
+      return res.status(400).json({ error: 'Cannot rate yourself' });
+    }
+
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Initialize ratings if they don't exist
+    if (!user.ratings) {
+      user.ratings = { upvotes: [], downvotes: [], history: [] };
+    }
+
+    const voterId = req.user.userId;
+    const { vote } = req.body;
+    const now = new Date();
+
+    // Remove any existing votes by this user
+    user.ratings.upvotes = user.ratings.upvotes.filter(vote => !vote.user.equals(voterId));
+    user.ratings.downvotes = user.ratings.downvotes.filter(vote => !vote.user.equals(voterId));
+
+    // Record vote history
+    user.ratings.history.push({
+      type: vote || 'remove',
+      user: voterId,
+      timestamp: now
+    });
+
+    // Add new vote if not removing
+    if (vote === 'up') {
+      user.ratings.upvotes.push({ user: voterId, timestamp: now });
+    } else if (vote === 'down') {
+      user.ratings.downvotes.push({ user: voterId, timestamp: now });
+    }
+
+    // Update badges
+    const totalVotes = user.ratings.upvotes.length + user.ratings.downvotes.length;
+    const positivePercentage = totalVotes > 0 
+      ? (user.ratings.upvotes.length / totalVotes) * 100 
+      : 0;
+
+    // Trusted Member badge
+    if (totalVotes >= 10 && positivePercentage >= 80) {
+      if (!user.badges.some(b => b.type === 'trusted_member' && b.active)) {
+        user.badges.push({
+          type: 'trusted_member',
+          earnedAt: now,
+          active: true
+        });
+      }
+    } else {
+      // Deactivate badge if criteria no longer met
+      user.badges.forEach(badge => {
+        if (badge.type === 'trusted_member') {
+          badge.active = false;
+        }
+      });
+    }
+
+    // Warning Flag badge
+    if (totalVotes >= 20 && positivePercentage < 30) {
+      if (!user.badges.some(b => b.type === 'warning_flag' && b.active)) {
+        user.badges.push({
+          type: 'warning_flag',
+          earnedAt: now,
+          active: true
+        });
+      }
+    } else {
+      user.badges.forEach(badge => {
+        if (badge.type === 'warning_flag') {
+          badge.active = false;
+        }
+      });
+    }
+
+    await user.save();
+
+    // Return updated rating stats
+    res.json({
+      upvotes: user.ratings.upvotes.length,
+      downvotes: user.ratings.downvotes.length,
+      positivePercentage: Math.round(positivePercentage),
+      badges: user.badges.filter(b => b.active).map(b => b.type)
+    });
+  } catch (error) {
+    console.error('Error rating user:', error);
+    res.status(500).json({ error: 'Failed to rate user' });
+  }
+});
+
+// Get user's rating with history
+router.get('/:userId/rating', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+      .populate('ratings.history.user', 'username avatar')
+      .populate('ratings.upvotes.user', 'username avatar')
+      .populate('ratings.downvotes.user', 'username avatar');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Filter out any votes from deleted users
+    if (user.ratings) {
+      user.ratings.upvotes = user.ratings.upvotes.filter(vote => vote.user);
+      user.ratings.downvotes = user.ratings.downvotes.filter(vote => vote.user);
+      user.ratings.history = user.ratings.history.filter(vote => vote.user);
+    }
+
+    // Get current user's vote if any
+    const currentUserVote = user.ratings?.upvotes?.some(v => v.user?._id.equals(req.user.userId)) ? 'up' :
+      user.ratings?.downvotes?.some(v => v.user?._id.equals(req.user.userId)) ? 'down' : null;
+
+    const totalVotes = (user.ratings?.upvotes?.length || 0) + (user.ratings?.downvotes?.length || 0);
+    const positivePercentage = totalVotes > 0 
+      ? Math.round((user.ratings.upvotes.length / totalVotes) * 100)
+      : 0;
+
+    // Get vote history with timestamps
+    const voteHistory = user.ratings?.history || [];
+    
+    // Get active badges
+    const activeBadges = user.badges?.filter(b => b.active) || [];
+
+    // Save the filtered ratings
+    await user.save();
+
+    res.json({
+      upvotes: user.ratings?.upvotes?.length || 0,
+      downvotes: user.ratings?.downvotes?.length || 0,
+      positivePercentage,
+      currentUserVote,
+      history: voteHistory.map(vote => ({
+        type: vote.type,
+        user: vote.user ? {
+          username: vote.user.username,
+          avatar: vote.user.avatar
+        } : null,
+        timestamp: vote.timestamp
+      })),
+      badges: activeBadges.map(b => ({
+        type: b.type,
+        earnedAt: b.earnedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error getting user rating:', error);
+    res.status(500).json({ error: 'Failed to get user rating' });
   }
 });
 

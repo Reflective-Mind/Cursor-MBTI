@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const TestResult = require('../models/TestResult');
 
 console.log('Initializing chat router');
@@ -130,13 +130,29 @@ Answers: ${result.answers?.map(a => `Q: ${a.question} A: ${a.answer}`).join(' | 
 
     let response;
     console.log('Test 5 - Using Mistral AI');
-    response = await mistralClient.chat({
-      model: "mistral-tiny",
-      messages: messages,
-      temperature: 0.7,
-      max_tokens: 150,
-      top_p: 0.9
-    });
+    try {
+      response = await mistralClient.chat({
+        model: "mistral-medium",  // Using a more reliable model
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        temperature: 0.7,
+        max_tokens: 500,  // Increased token limit for story generation
+        top_p: 0.9
+      });
+    } catch (error) {
+      console.error('Mistral API Error:', error);
+      // Fallback to a simpler response if the API fails
+      return res.status(200).json({
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: 'I apologize, but I am currently having trouble generating a detailed story. Please try again in a moment.'
+          }
+        }]
+      });
+    }
     
     console.log('Test 5 - Raw Mistral response:', JSON.stringify(response, null, 2));
 

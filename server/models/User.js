@@ -1,6 +1,31 @@
+/**
+ * User Model
+ * ==========
+ * 
+ * Core model for user management in the MBTI Insights application.
+ * Handles user authentication, profile data, and MBTI-related information.
+ * 
+ * Key Features:
+ * - User authentication and authorization
+ * - Profile management with customizable sections
+ * - MBTI personality type tracking
+ * - User rating system
+ * - Admin functionality
+ * 
+ * Security Features:
+ * - Password hashing using bcrypt
+ * - Role-based access control
+ * - Secure profile data exposure
+ */
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+/**
+ * Content Schema
+ * -------------
+ * Defines the structure for content items within profile sections
+ */
 const contentSchema = new mongoose.Schema({
   id: String,
   title: String,
@@ -11,6 +36,11 @@ const contentSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+/**
+ * Profile Section Schema
+ * --------------------
+ * Defines customizable sections in user profiles
+ */
 const profileSectionSchema = new mongoose.Schema({
   id: String,
   title: String,
@@ -40,7 +70,8 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    set: v => v.toLowerCase()
   },
   password: {
     type: String,
@@ -115,11 +146,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  roles: [{
-    type: String,
-    enum: ['user', 'moderator', 'admin'],
-    default: 'user'
-  }],
+  roles: {
+    type: [String],
+    default: ['user'],
+    enum: ['user', 'admin']
+  },
   theme: {
     primaryColor: {
       type: String,
@@ -157,6 +188,51 @@ const userSchema = new mongoose.Schema({
         default: 0
       }
     }
+  },
+  ratings: {
+    upvotes: [{
+      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      timestamp: { type: Date, default: Date.now }
+    }],
+    downvotes: [{
+      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      timestamp: { type: Date, default: Date.now }
+    }],
+    positivePercentage: { type: Number, default: 0 },
+    history: [{
+      type: { type: String, enum: ['upvote', 'downvote'] },
+      user: {
+        _id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        username: String,
+        avatar: String
+      },
+      timestamp: { type: Date, default: Date.now }
+    }]
+  },
+  badges: [{
+    type: { type: String, enum: ['trusted_member', 'active_contributor', 'warning_flag'] },
+    earnedAt: { type: Date, default: Date.now },
+    active: { type: Boolean, default: true }
+  }],
+  adminActions: [{
+    type: {
+      type: String,
+      enum: ['delete_profile', 'reset_ratings', 'manage_badges'],
+      required: true
+    },
+    targetUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    details: mongoose.Schema.Types.Mixed,
+    timestamp: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true
@@ -270,7 +346,12 @@ userSchema.methods.getPublicProfile = function() {
     roles: this.roles,
     joinedAt: this.joinedAt,
     lastActive: this.lastActive,
-    profileSections: this.profileSections
+    profileSections: this.profileSections,
+    ratings: {
+      upvotes: this.ratings?.upvotes?.length || 0,
+      downvotes: this.ratings?.downvotes?.length || 0,
+      positivePercentage: this.ratings?.positivePercentage || 0
+    }
   };
 };
 
