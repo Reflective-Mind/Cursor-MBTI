@@ -1,11 +1,12 @@
 services:
   - type: web
-    name: cursor-mbti-backend
+    name: unreal-mesh-generator
     env: node
-    rootDir: server
-    buildCommand: npm install
+    plan: free
+    buildCommand: npm install && npm run build
     startCommand: npm start
-    nodeVersion: 18.x
     envVars:
       - key: NODE_ENV
-        value: production 
+        value: production
+      - key: PORT
+        value: 10000 

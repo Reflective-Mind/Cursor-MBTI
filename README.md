@@ -1,129 +1,85 @@
-# MBTI Insights Project
-=====================
+# Unreal Engine Mesh Generator
 
-## Project Structure
-```
-project_root/
-├── docs/                          # Project documentation
-│   ├── ENVIRONMENT_STRUCTURE.md   # Environment setup guide
-│   └── CONTRIBUTING.md           # Contribution guidelines
-├── server/                        # Backend server
-│   ├── docs/                     # Server documentation
-│   ├── src/                      # Source code
-│   ├── test/                     # Test files
-│   ├── scripts/                  # Utility scripts
-│   └── config/                   # Configuration files
-└── client/                        # Frontend client
-    ├── docs/                     # Client documentation
-    ├── src/                      # React source code
-    ├── public/                   # Static files
-    └── config/                   # Client configuration
-```
+A web-based tool for generating THREE.js 3D meshes that can be exported and used in Unreal Engine and other 3D environments.
 
-## Environment Configuration
+## Features
 
-### Server Environment Files
-- `server/.env`: Main server configuration
-- `server/.env.example`: Template for setup
-- `server/test/.env.test`: Test configuration
+- Create complex 3D meshes using procedural generation techniques
+- Leverage AI-assisted code generation for custom mesh designs
+- Export meshes to Unreal Engine-compatible formats
+- Built-in examples including:
+  - Dragon
+  - Spiritual Tree
+  - Mandala Patterns
+  - Yin-Yang Symbol
+  - Character Figure
+  - And more!
+- Live preview of generated meshes
+- Code editor with syntax highlighting
+- Responsive design for various screen sizes
 
-### Client Environment Files
-- `client/.env.development`: Development settings
-- `client/.env.production`: Production settings
+## Technologies Used
 
-## Documentation Structure
+- THREE.js for 3D rendering
+- Next.js framework for frontend and API
+- JavaScript/ES6+
+- HTML5/CSS3
+- OpenAI integration for AI-assisted code generation
 
-### Project Documentation
-- `docs/`: Project-level documentation
-- `server/docs/`: Server-specific docs
-- `client/docs/`: Client-specific docs
+## Getting Started
 
-### Code Documentation
-- Component documentation in code
-- API documentation in server
-- Test documentation in test files
+### Online Demo
 
-## Development Setup
+The application is available online at:
+- [Vercel Deployment](https://cursor-mbti.vercel.app/)
+- [Render Deployment](https://cursor-mbti.onrender.com/)
 
-1. Clone repository
-2. Copy environment files:
-   ```bash
-   cp server/.env.example server/.env
-   cp client/.env.development.example client/.env.development
-   ```
-3. Install dependencies:
-   ```bash
-   # Server
-   cd server && npm install
-   
-   # Client
-   cd client && npm install
-   ```
-4. Start development servers:
-   ```bash
-   # Server
-   cd server && npm run dev
-   
-   # Client
-   cd client && npm start
-   ```
+### Local Development
 
-## Configuration Validation
-
-Run the validation script:
+1. Clone the repository:
 ```bash
-cd server && npm run validate-config
+git clone https://github.com/Reflective-Mind/Cursor-MBTI.git
+cd Cursor-MBTI
 ```
 
-This will:
-1. Verify environment files
-2. Check configuration values
-3. Validate cross-component compatibility
-4. Test database connection
+2. Install dependencies:
+```bash
+npm install
+```
 
-## Project Organization
+3. Run the development server:
+```bash
+npm run dev
+```
 
-The project follows a strict organization:
-1. No duplicate files
-2. Clear separation of concerns
-3. Proper documentation
-4. Regular validation
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### File Locations
-- Configuration files in respective directories
-- Documentation in docs folders
-- Source code in src directories
-- Tests in test directories
+## Usage
 
-### Maintenance Rules
-1. Keep documentation updated
-2. Remove duplications
-3. Validate configurations
-4. Follow structure guidelines
+1. Select an example from the dropdown or create your own mesh
+2. Modify the code in the editor to customize the mesh
+3. Click "Generate" to create the mesh
+4. Use the camera controls to inspect the mesh from different angles
+5. Export the mesh for use in Unreal Engine or other 3D environments
 
-## Security
+## Embedding in Wix
 
-- No credentials in version control
-- Use environment variables
-- Follow security guidelines
-- Regular security audits
+This application can be embedded in Wix websites using an iframe:
 
-## Contributing
-
-See `CONTRIBUTING.md` for:
-- Code standards
-- Pull request process
-- Documentation requirements
-- Testing guidelines
+```html
+<iframe 
+    src="https://cursor-mbti.vercel.app/" 
+    width="100%" 
+    height="800px" 
+    frameborder="0" 
+    allow="fullscreen">
+</iframe>
+```
 
 ## License
 
-MIT License - See LICENSE file
+MIT License
 
-## Support
+## Contact
 
-For issues:
-1. Check documentation
-2. Search existing issues
-3. Create detailed bug report
-4. Follow templates 
+For questions, suggestions, or support, please open an issue on the GitHub repository. 

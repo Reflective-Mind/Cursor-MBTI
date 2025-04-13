@@ -1,0 +1,478 @@
+.container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+.sidebar {
+    width: 40%;
+    min-width: 350px;
+    max-width: 600px;
+    background-color: #252526;
+    padding: 15px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.viewport {
+    flex: 1;
+    background-color: #333;
+    position: relative;
+    height: 100%;
+}
+
+.viewer {
+    width: 100%;
+    height: 100%;
+}
+
+.title {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #0078d7;
+    font-size: 1.5rem;
+}
+
+.codeEditorContainer {
+    position: relative;
+    height: 40%;
+    min-height: 200px;
+    margin-bottom: 10px;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.button {
+    background-color: #0078d7;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.button:hover {
+    background-color: #0063b1;
+}
+
+.button:active {
+    background-color: #004e8c;
+}
+
+.primaryBtn {
+    background-color: #2ea043;
+}
+
+.primaryBtn:hover {
+    background-color: #238636;
+}
+
+.exportBtn {
+    background-color: #8957e5;
+}
+
+.exportBtn:hover {
+    background-color: #7548c7;
+}
+
+.exampleButtons {
+    margin-bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.statusContainer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.status {
+    flex: 1;
+    padding: 10px;
+    background-color: #1e1e1e;
+    border-radius: 3px;
+    overflow-y: auto;
+    border: 1px solid #3c3c3c;
+}
+
+.statusLog {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+}
+
+.error {
+    color: #ff6347;
+}
+
+.success {
+    color: #4caf50;
+}
+
+.panelLabel {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #0078d7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.meshInfo {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.loadingIndicator {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 5px;
+    z-index: 100;
+}
+
+.resizeHandle {
+    width: 5px;
+    background-color: #333;
+    cursor: ew-resize;
+}
+
+.tabs {
+    display: flex;
+    margin-bottom: 10px;
+}
+
+.tab {
+    padding: 8px 15px;
+    background-color: #2d2d2d;
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+    margin-right: 5px;
+}
+
+.tabActive {
+    background-color: #1e1e1e;
+    border: 1px solid #3c3c3c;
+    border-bottom: none;
+}
+
+.exportOptions {
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.exportOptions label {
+    margin-right: 10px;
+    font-size: 14px;
+}
+
+.exportFormat {
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+    border: 1px solid #3c3c3c;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.aiPromptContainer {
+    margin-top: 10px;
+    position: relative;
+}
+
+.copyPromptBtn {
+    background-color: #0078d7;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+}
+
+.copyPromptBtn:hover {
+    background-color: #0063b1;
+}
+
+.tooltip {
+    position: absolute;
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 5px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.modalActive {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modalContent {
+    background-color: #252526;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+}
+
+.modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.modalTitle {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #0078d7;
+}
+
+.modalClose {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modalClose:hover {
+    color: #ccc;
+}
+
+.modalBody {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #3c3c3c;
+    border-radius: 4px;
+    background-color: #1e1e1e;
+    padding: 15px;
+    margin-bottom: 15px;
+    white-space: pre-wrap;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.modalFooter {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Selection UI Styles */
+.selectionUI {
+    position: absolute;
+    bottom: 50px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: 1px solid #0078d7;
+    z-index: 100;
+    min-width: 200px;
+}
+
+.selectionTitle {
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #0078d7;
+    font-size: 14px;
+}
+
+.selectionControls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.selectionControls button {
+    padding: 5px 10px;
+    font-size: 12px;
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.selectionControls button:hover {
+    background-color: #444;
+}
+
+.deleteBtn {
+    background-color: #712121 !important;
+}
+
+.deleteBtn:hover {
+    background-color: #8f2727 !important;
+}
+
+.transformBtn {
+    background-color: #555;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    margin-right: 5px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.transformBtn:hover {
+    background-color: #777;
+}
+
+.transformBtnActive {
+    background-color: #0078d7;
+}
+
+/* Snap controls similar to Unreal Engine */
+.snapControls {
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+.snapLabel {
+    font-size: 12px;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.snapOptions {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+}
+
+.snapOption {
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+    padding: 3px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+    flex: 1;
+    transition: background-color 0.2s;
+}
+
+.snapOption:hover {
+    background-color: #444;
+}
+
+.snapOptionActive {
+    background-color: #0078d7;
+    border-color: #0078d7;
+}
+
+/* Parts Selector Dropdown Styles */
+.partsSelector {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.partsSelectorLabel {
+    font-size: 12px;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.partsDropdown {
+    width: 100%;
+    padding: 5px;
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 3px;
+    margin-bottom: 5px;
+}
+
+.partsNavigation {
+    display: flex;
+    gap: 5px;
+}
+
+.navButton {
+    flex: 1;
+    background-color: #444;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.navButton:hover {
+    background-color: #555;
+} 

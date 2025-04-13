@@ -1,52 +1,34 @@
-# Dependencies
-node_modules
+# dependencies
+/node_modules
 /.pnp
 .pnp.js
 
-# Testing
+# testing
 /coverage
 
-# Production
+# next.js
+/.next/
+/out/
+
+# production
 /build
-/client/build
 
-# Environment files
-.env
-.env.local
-.env.*.local
-!.env.example
-!.env.*.example
-
-# Development environment files
-client/.env.development
-client/.env.production
-server/.env
-server/test/.env.test
-
-# Ignore all files containing potential credentials
+# misc
+.DS_Store
 *.pem
-*.key
-*.cert
-*.env
-!*.env.example
 
-# Keep example files
-!client/.env.development.example
-!client/.env.production.example
-!server/.env.example
-!server/test/.env.test.example
-
-# Logs
+# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
+# local env files
+.env*.local
 
-# OS
-.DS_Store
-Thumbs.db
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts 
