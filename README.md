@@ -62,6 +62,25 @@ npm run dev
 4. Use the camera controls to inspect the mesh from different angles
 5. Export the mesh for use in Unreal Engine or other 3D environments
 
+## Deployment
+
+This project is set up for automatic deployment using GitHub Actions:
+
+- **Vercel Deployment**: Automatically deploys when changes are pushed to the main branch
+- **Render Deployment**: Also automatically deploys with changes to the main branch
+
+For setup instructions:
+- See [CONNECT_SERVICES.md](./CONNECT_SERVICES.md) for manual connection instructions
+- See [GITHUB_SECRETS.md](./GITHUB_SECRETS.md) for setting up GitHub Secrets for automation
+
+### Deployment Workflow
+
+The deployment process follows these steps:
+1. Code is pushed to the GitHub repository
+2. GitHub Actions workflow builds the project
+3. If build is successful, it triggers deployment to both Vercel and Render
+4. Changes are live within minutes
+
 ## Embedding in Wix
 
 This application can be embedded in Wix websites using an iframe:
