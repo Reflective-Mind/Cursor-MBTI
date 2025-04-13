@@ -7,46 +7,39 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [16.x, 18.x]
-
     steps:
     - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
+    
+    - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: '18.x'
         cache: 'npm'
-    - run: npm ci
-    - run: npm run build
-    - run: npm run lint || true
-    
-  deploy-to-vercel:
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: Deploy to Vercel
-        run: |
-          vercel --token ${VERCEL_TOKEN} --prod
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          
-  deploy-to-render:
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to Render
-        uses: johnbeynon/render-deploy-action@v0.0.8
-        with:
-          service-id: ${{ secrets.RENDER_SERVICE_ID }}
-          api-key: ${{ secrets.RENDER_API_KEY }} 
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build
+      run: npm run build
+      env:
+        NODE_ENV: production
+        REACT_APP_API_URL: https://mbti-render.onrender.com
+        REACT_APP_SOCKET_URL: https://mbti-render.onrender.com
+      
+    - name: Install Vercel CLI
+      run: npm install --global vercel@latest
+      
+    - name: Deploy to Vercel
+      run: vercel --token ${VERCEL_TOKEN} --prod --yes
+      env:
+        VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || 'LMHUkxlQiZp9LB43YQAVVaui' }}
+      
+    - name: Deploy to Render
+      run: |
+        curl -X POST https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID || 'srv-cnl05lvp1b2c73c10m6g' }}/deploys \
+          -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY || 'rnd_Vb9j1bpnBwHvFnLtvDqXfbK3oNnS' }}"
+      env:
+        RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID || 'srv-cnl05lvp1b2c73c10m6g' }}
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || 'rnd_Vb9j1bpnBwHvFnLtvDqXfbK3oNnS' }} 
